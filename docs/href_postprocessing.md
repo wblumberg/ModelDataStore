@@ -1,0 +1,40 @@
+What products do we want for the HREF?
+
+- Mean 2-m Temperature
+- Mean 2-m Dewpoint
+- Mean 10-m u wind
+- Mean 10-m v wind
+- Mean CAPE and CIN
+- Mean SRH 0-1 km 
+- Mean SRH 0-3 km
+- Mean MSLP
+- 4-hr max and min 2-5 km updraft helicity
+- 4-hr max updraft 
+- 4-hr min downdraft
+- 4-hr max surface wind speed
+- Neighborhood probability is calculated using 40 km radius.
+- Neighborhood probability threshold for 4-hour windows and a 40 km radius:
+    - UP > 20 m/s 
+    - UP > 30 m/s 
+    - UH > 50 m2/s2
+    - UH > 75 m2/s2
+    - UH > 100 m2/s2
+    - UH > 150 m2/s2
+    - WS > 10 m/s
+    - WS > 20 m/s
+- Precipitation Plots showing:
+    - Precipitation Type * 1-hr precip in inches (e.g., p01i * csnow)
+    - Precipitation Type * reflectivity (e.g., REFD * csnow)
+    - LPMM, PMM?
+    - Median 1-km reflectivity by dominant PTYPE
+
+- 1-hr QPF and dominant precipitation type, ensemble mean
+- Paintball Plots for:
+    - UH
+    - REFD
+    - Updraft
+    - Color by member:
+        - Name
+        - PBL scheme
+        - Microphysics scheme
+        - Core (e.g., FV3, MPAS, ARW)

@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "EnsDataStore"
+version = "0.1.0"
+description = "Weather data ingestion, ensemble assembly, and post-processing utilities"
+requires-python = ">=3.11"
+dependencies = [
+    "beautifulsoup4",
+    "dask",
+    "grib2io",
+    "numcodecs",
+    "numpy",
+    "pint",
+    "pint-xarray",
+    "pydap",
+    "requests",
+    "xarray",
+    "zarr<3",
+]
+
+[project.optional-dependencies]
+diagnostics = [
+    "matplotlib",
+]
+obs-gempak = [
+    "gempakio",
+    "metpy",
+]
+tropical-tracks = [
+    "climada-petals",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

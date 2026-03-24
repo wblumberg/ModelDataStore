@@ -1,0 +1,282 @@
+[
+  {
+    "name": "MAXUVV_max_1h",
+    "grib_name": "MAXUVV",
+    "long_name": "Hourly Maximum of Upward Vertical Velocity",
+    "units": "m s-1",
+    "level1": "10000",
+    "level2": "100000",
+    "level_type": "",
+    "type": "max_1h"
+  },
+  {
+    "name": "TMP_hght_2",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "2",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "instant"
+  },
+  {
+    "name": "SNOD",
+    "grib_name": "SNOD",
+    "long_name": "Snow Depth",
+    "units": "m",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "PRATE",
+    "grib_name": "PRATE",
+    "long_name": "Precipitation Rate",
+    "units": "kg m-2 s-1",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "CAPE",
+    "grib_name": "CAPE",
+    "long_name": "Convective Available Potential Energy",
+    "units": "J kg-1",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "CICEP",
+    "grib_name": "CICEP",
+    "long_name": "Categorical Ice Pellets",
+    "units": "Code table 4.222",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "DPT_hght_2",
+    "grib_name": "DPT",
+    "long_name": "Dew Point Temperature",
+    "units": "K",
+    "level1": "2",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "instant"
+  },
+  {
+    "name": "CSNOW",
+    "grib_name": "CSNOW",
+    "long_name": "Categorical Snow",
+    "units": "Code table 4.222",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "HLCY_hght_3000_0",
+    "grib_name": "HLCY",
+    "long_name": "Storm Relative Helicity",
+    "units": "m2 s-2",
+    "level1": "3000",
+    "level2": "0",
+    "level_type": "HGHT",
+    "type": "instant"
+  },
+  {
+    "name": "WIND_hght_10_max_1h",
+    "grib_name": "WIND",
+    "long_name": "Wind Speed",
+    "units": "m s-1",
+    "level1": "10",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "max_1h"
+  },
+  {
+    "name": "MAXVW_hght_10_max_1h",
+    "grib_name": "MAXVW",
+    "long_name": "V Component of Hourly Maximum 10m Wind Speed",
+    "units": "m s-1",
+    "level1": "10",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "max_1h"
+  },
+  {
+    "name": "CFRZR",
+    "grib_name": "CFRZR",
+    "long_name": "Categorical Freezing Rain",
+    "units": "Code table 4.222",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "MAXDVV_max_1h",
+    "grib_name": "MAXDVV",
+    "long_name": "Hourly Maximum of Downward Vertical Velocity",
+    "units": "m s-1",
+    "level1": "10000",
+    "level2": "100000",
+    "level_type": "",
+    "type": "max_1h"
+  },
+  {
+    "name": "APCP_accum_1h",
+    "grib_name": "APCP",
+    "long_name": "Total Precipitation",
+    "units": "kg m-2",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "accum_1h"
+  },
+  {
+    "name": "REFC",
+    "grib_name": "REFC",
+    "long_name": "Composite reflectivity",
+    "units": "dB",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "CIN",
+    "grib_name": "CIN",
+    "long_name": "Convective Inhibition",
+    "units": "J kg-1",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "GUST",
+    "grib_name": "GUST",
+    "long_name": "Wind Speed (Gust)",
+    "units": "m s-1",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "CRAIN",
+    "grib_name": "CRAIN",
+    "long_name": "Categorical Rain",
+    "units": "Code table 4.222",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "MSLMA",
+    "grib_name": "MSLMA",
+    "long_name": "MSLP (MAPS System Reduction)",
+    "units": "Pa",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_hght_10",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "10",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "instant"
+  },
+  {
+    "name": "MAXUW_hght_10_max_1h",
+    "grib_name": "MAXUW",
+    "long_name": "U Component of Hourly Maximum 10m Wind Speed",
+    "units": "m s-1",
+    "level1": "10",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "max_1h"
+  },
+  {
+    "name": "MXUPHL_hght_5000_2000_max_1h",
+    "grib_name": "MXUPHL",
+    "long_name": "Hourly Maximum of Updraft Helicity",
+    "units": "m2 s-2",
+    "level1": "5000",
+    "level2": "2000",
+    "level_type": "HGHT",
+    "type": "max_1h"
+  },
+  {
+    "name": "HPBL",
+    "grib_name": "HPBL",
+    "long_name": "Planetary Boundary Layer Height",
+    "units": "m",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "MNUPHL_hght_5000_2000_min_1h",
+    "grib_name": "MNUPHL",
+    "long_name": "Hourly Minimum of Updraft Helicity",
+    "units": "m2 s-2",
+    "level1": "5000",
+    "level2": "2000",
+    "level_type": "HGHT",
+    "type": "min_1h"
+  },
+  {
+    "name": "HLCY_hght_1000_0",
+    "grib_name": "HLCY",
+    "long_name": "Storm Relative Helicity",
+    "units": "m2 s-2",
+    "level1": "1000",
+    "level2": "0",
+    "level_type": "HGHT",
+    "type": "instant"
+  },
+  {
+    "name": "REFD_hght_1000",
+    "grib_name": "REFD",
+    "long_name": "Reflectivity",
+    "units": "dB",
+    "level1": "1000",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_hght_10",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "10",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "instant"
+  },
+  {
+    "name": "MAXREF_hght_1000_max_1h",
+    "grib_name": "MAXREF",
+    "long_name": "Hourly Maximum of Simulated Reflectivity",
+    "units": "dB",
+    "level1": "1000",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "max_1h"
+  },
+]

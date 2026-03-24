@@ -1,0 +1,23 @@
+- Mean 500 mb Heights
+- Spread 500 mb Heights
+- Mean PMSL
+- Spread PMSL
+- Mean 2-m Temperature
+- Spread 2-m Temperature
+- Low locations?
+- Probability of CAPE?
+- Mean CAPE? 
+- Probability of 2-m Dewpoint > 50 F
+- Probability of 2-m Dewpoint > 60 F
+- Probability of 2-m Dewpoint > 70 F
+- Probability of 2-m Temperature > 90 F
+- Probability of 2-m Temperature > 100 F
+- Probability of 2-m Temperature > 110 F
+- Probability of 10-m to 500 mb wind shear > 30 kts
+- Probability of 10-m to 500 mb wind shear > 40 kts
+- Probability of 10-m to 500 mb wind shear > 50 kts
+- Precipitation Plots showing:
+    - Precipitation Type * 1-hr precip in inches (e.g., p01i * csnow)
+    - Precipitation Type * reflectivity (e.g., REFD * csnow)
+    - LPMM, PMM?
+    - Median 1-km reflectivity by dominant PTYPE

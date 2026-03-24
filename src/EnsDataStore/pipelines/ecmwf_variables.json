@@ -1,0 +1,1472 @@
+[
+  {
+    "name": "RH_pres_30000",
+    "grib_name": "RH",
+    "long_name": "Relative Humidity",
+    "units": "%",
+    "level1": "30000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TMP_pres_70000",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "70000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SKINT",
+    "grib_name": "SKINT",
+    "long_name": "Skin Temperature",
+    "units": "K",
+    "level1": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "RELD_pres_10000",
+    "grib_name": "RELD",
+    "long_name": "Relative Divergence",
+    "units": "s-1",
+    "level1": "10000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_pres_10000",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "10000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "LAND",
+    "grib_name": "LAND",
+    "long_name": "Land Cover (0=sea, 1=land)",
+    "units": "Proportion",
+    "level1": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "SPFH_pres_30000",
+    "grib_name": "SPFH",
+    "long_name": "Specific Humidity",
+    "units": "kg kg-1",
+    "level1": "30000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "HGT_pres_92500",
+    "grib_name": "HGT",
+    "long_name": "Geopotential Height",
+    "units": "gpm",
+    "level1": "92500",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_pres_30000",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "30000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VVEL_pres_25000",
+    "grib_name": "VVEL",
+    "long_name": "Vertical Velocity (Pressure)",
+    "units": "Pa s-1",
+    "level1": "25000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RH_pres_10000",
+    "grib_name": "RH",
+    "long_name": "Relative Humidity",
+    "units": "%",
+    "level1": "10000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_pres_100000",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "100000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SPFH_pres_92500",
+    "grib_name": "SPFH",
+    "long_name": "Specific Humidity",
+    "units": "kg kg-1",
+    "level1": "92500",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "CAPE",
+    "grib_name": "CAPE",
+    "long_name": "Convective Available Potential Energy",
+    "units": "J kg-1",
+    "level1": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "VVEL_pres_20000",
+    "grib_name": "VVEL",
+    "long_name": "Vertical Velocity (Pressure)",
+    "units": "Pa s-1",
+    "level1": "20000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELD_pres_70000",
+    "grib_name": "RELD",
+    "long_name": "Relative Divergence",
+    "units": "s-1",
+    "level1": "70000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TMP_pres_20000",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "20000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_pres_70000",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "70000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RH_pres_70000",
+    "grib_name": "RH",
+    "long_name": "Relative Humidity",
+    "units": "%",
+    "level1": "70000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELD_pres_25000",
+    "grib_name": "RELD",
+    "long_name": "Relative Divergence",
+    "units": "s-1",
+    "level1": "25000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TMP_pres_100000",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "100000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TMP_pres_85000",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "85000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TMP_pres_15000",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "15000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "HGT_pres_40000",
+    "grib_name": "HGT",
+    "long_name": "Geopotential Height",
+    "units": "gpm",
+    "level1": "40000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELD_pres_20000",
+    "grib_name": "RELD",
+    "long_name": "Relative Divergence",
+    "units": "s-1",
+    "level1": "20000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VVEL_pres_85000",
+    "grib_name": "VVEL",
+    "long_name": "Vertical Velocity (Pressure)",
+    "units": "Pa s-1",
+    "level1": "85000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_pres_70000",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "70000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "DPT_hght_2",
+    "grib_name": "DPT",
+    "long_name": "Dew Point Temperature",
+    "units": "K",
+    "level1": "2",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "instant"
+  },
+  {
+    "name": "NSURFWVEL",
+    "grib_name": "NSURFWVEL",
+    "long_name": "Northward surface water velocity",
+    "units": "m s-1",
+    "level1": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "RELV_pres_25000",
+    "grib_name": "RELV",
+    "long_name": "Relative Vorticity",
+    "units": "s-1",
+    "level1": "25000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "ICETK",
+    "grib_name": "ICETK",
+    "long_name": "Ice Thickness",
+    "units": "m",
+    "level1": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "SPFH_pres_60000",
+    "grib_name": "SPFH",
+    "long_name": "Specific Humidity",
+    "units": "kg kg-1",
+    "level1": "60000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_pres_60000",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "60000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VVEL_pres_50000",
+    "grib_name": "VVEL",
+    "long_name": "Vertical Velocity (Pressure)",
+    "units": "Pa s-1",
+    "level1": "50000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELD_pres_15000",
+    "grib_name": "RELD",
+    "long_name": "Relative Divergence",
+    "units": "s-1",
+    "level1": "15000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "HGT_pres_85000",
+    "grib_name": "HGT",
+    "long_name": "Geopotential Height",
+    "units": "gpm",
+    "level1": "85000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_pres_15000",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "15000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELV_pres_20000",
+    "grib_name": "RELV",
+    "long_name": "Relative Vorticity",
+    "units": "s-1",
+    "level1": "20000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELV_pres_40000",
+    "grib_name": "RELV",
+    "long_name": "Relative Vorticity",
+    "units": "s-1",
+    "level1": "40000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RH_pres_15000",
+    "grib_name": "RH",
+    "long_name": "Relative Humidity",
+    "units": "%",
+    "level1": "15000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SPFH_pres_10000",
+    "grib_name": "SPFH",
+    "long_name": "Specific Humidity",
+    "units": "kg kg-1",
+    "level1": "10000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VVEL_pres_30000",
+    "grib_name": "VVEL",
+    "long_name": "Vertical Velocity (Pressure)",
+    "units": "Pa s-1",
+    "level1": "30000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "HGT_pres_30000",
+    "grib_name": "HGT",
+    "long_name": "Geopotential Height",
+    "units": "gpm",
+    "level1": "30000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SOILTMP_3",
+    "grib_name": "SOILTMP",
+    "long_name": "Soil Temperature",
+    "units": "K",
+    "level1": "3",
+    "level2": "4",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "TMP_pres_30000",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "30000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELV_pres_15000",
+    "grib_name": "RELV",
+    "long_name": "Relative Vorticity",
+    "units": "s-1",
+    "level1": "15000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TMP_pres_92500",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "92500",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELV_pres_85000",
+    "grib_name": "RELV",
+    "long_name": "Relative Vorticity",
+    "units": "s-1",
+    "level1": "85000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_pres_20000",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "20000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_pres_40000",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "40000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TMP_pres_10000",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "10000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "HGT_pres_15000",
+    "grib_name": "HGT",
+    "long_name": "Geopotential Height",
+    "units": "gpm",
+    "level1": "15000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TPRATE",
+    "grib_name": "TPRATE",
+    "long_name": "Total Precipitation Rate",
+    "units": "kg m-2 s-1",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_pres_100000",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "100000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELV_pres_5000",
+    "grib_name": "RELV",
+    "long_name": "Relative Vorticity",
+    "units": "s-1",
+    "level1": "5000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELD_pres_92500",
+    "grib_name": "RELD",
+    "long_name": "Relative Divergence",
+    "units": "s-1",
+    "level1": "92500",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_pres_92500",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "92500",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_pres_15000",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "15000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "DSLM",
+    "grib_name": "DSLM",
+    "long_name": "Deviation of Sea Level from Mean",
+    "units": "m",
+    "level1": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "VSOILM_4",
+    "grib_name": "VSOILM",
+    "long_name": "Volumetric Soil Moisture",
+    "units": "m3 m-3",
+    "level1": "3",
+    "level2": "4",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "TMP_pres_40000",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "40000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "HGT_pres_5000",
+    "grib_name": "HGT",
+    "long_name": "Geopotential Height",
+    "units": "gpm",
+    "level1": "5000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "MXSALB",
+    "grib_name": "MXSALB",
+    "long_name": "Maximum Snow Albedo",
+    "units": "%",
+    "level1": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "VVEL_pres_60000",
+    "grib_name": "VVEL",
+    "long_name": "Vertical Velocity (Pressure)",
+    "units": "Pa s-1",
+    "level1": "60000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "HGT_pres_60000",
+    "grib_name": "HGT",
+    "long_name": "Geopotential Height",
+    "units": "gpm",
+    "level1": "60000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_pres_25000",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "25000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SPFH_pres_5000",
+    "grib_name": "SPFH",
+    "long_name": "Specific Humidity",
+    "units": "kg kg-1",
+    "level1": "5000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_hght_10",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "10",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "instant"
+  },
+  {
+    "name": "RELD_pres_100000",
+    "grib_name": "RELD",
+    "long_name": "Relative Divergence",
+    "units": "s-1",
+    "level1": "100000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RH_pres_25000",
+    "grib_name": "RH",
+    "long_name": "Relative Humidity",
+    "units": "%",
+    "level1": "25000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TCIWV",
+    "grib_name": "TCIWV",
+    "long_name": "Total Column Integrated Water Vapour",
+    "units": "kg m-2",
+    "level1": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level2": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_pres_20000",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "20000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELD_pres_40000",
+    "grib_name": "RELD",
+    "long_name": "Relative Divergence",
+    "units": "s-1",
+    "level1": "40000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RH_pres_20000",
+    "grib_name": "RH",
+    "long_name": "Relative Humidity",
+    "units": "%",
+    "level1": "20000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SOILTMP",
+    "grib_name": "SOILTMP",
+    "long_name": "Soil Temperature",
+    "units": "K",
+    "level1": "0",
+    "level2": "1",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "RH_pres_40000",
+    "grib_name": "RH",
+    "long_name": "Relative Humidity",
+    "units": "%",
+    "level1": "40000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TCWAT",
+    "grib_name": "TCWAT",
+    "long_name": "Total Column Water (Vertically integrated total water (vapour+cloud water/ice)",
+    "units": "kg m-2",
+    "level1": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level2": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "SOILTMP_4",
+    "grib_name": "SOILTMP",
+    "long_name": "Soil Temperature",
+    "units": "K",
+    "level1": "1",
+    "level2": "2",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "HGT_pres_20000",
+    "grib_name": "HGT",
+    "long_name": "Geopotential Height",
+    "units": "gpm",
+    "level1": "20000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELD_pres_85000",
+    "grib_name": "RELD",
+    "long_name": "Relative Divergence",
+    "units": "s-1",
+    "level1": "85000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_pres_85000",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "85000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SPFH_pres_40000",
+    "grib_name": "SPFH",
+    "long_name": "Specific Humidity",
+    "units": "kg kg-1",
+    "level1": "40000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_pres_40000",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "40000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RH_pres_100000",
+    "grib_name": "RH",
+    "long_name": "Relative Humidity",
+    "units": "%",
+    "level1": "100000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RH_pres_85000",
+    "grib_name": "RH",
+    "long_name": "Relative Humidity",
+    "units": "%",
+    "level1": "85000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELV_pres_100000",
+    "grib_name": "RELV",
+    "long_name": "Relative Vorticity",
+    "units": "s-1",
+    "level1": "100000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_pres_92500",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "92500",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RH_pres_5000",
+    "grib_name": "RH",
+    "long_name": "Relative Humidity",
+    "units": "%",
+    "level1": "5000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SPFH_pres_70000",
+    "grib_name": "SPFH",
+    "long_name": "Specific Humidity",
+    "units": "kg kg-1",
+    "level1": "70000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VVEL_pres_5000",
+    "grib_name": "VVEL",
+    "long_name": "Vertical Velocity (Pressure)",
+    "units": "Pa s-1",
+    "level1": "5000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SPFH_pres_25000",
+    "grib_name": "SPFH",
+    "long_name": "Specific Humidity",
+    "units": "kg kg-1",
+    "level1": "25000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_pres_25000",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "25000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_pres_50000",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "50000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TMP_pres_60000",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "60000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SPFH_pres_100000",
+    "grib_name": "SPFH",
+    "long_name": "Specific Humidity",
+    "units": "kg kg-1",
+    "level1": "100000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "CDLYR",
+    "grib_name": "CDLYR",
+    "long_name": "Non-Convective Cloud Cover",
+    "units": "%",
+    "level1": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level2": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "ESURFWVEL",
+    "grib_name": "ESURFWVEL",
+    "long_name": "Eastward surface water velocity",
+    "units": "m s-1",
+    "level1": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "PTYPE",
+    "grib_name": "PTYPE",
+    "long_name": "Precipitation Type",
+    "units": "See Table 4.201",
+    "level1": "0",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "VVEL_pres_40000",
+    "grib_name": "VVEL",
+    "long_name": "Vertical Velocity (Pressure)",
+    "units": "Pa s-1",
+    "level1": "40000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SPFH_pres_85000",
+    "grib_name": "SPFH",
+    "long_name": "Specific Humidity",
+    "units": "kg kg-1",
+    "level1": "85000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_pres_85000",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "85000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TMP_hght_2",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "2",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "instant"
+  },
+  {
+    "name": "VVEL_pres_10000",
+    "grib_name": "VVEL",
+    "long_name": "Vertical Velocity (Pressure)",
+    "units": "Pa s-1",
+    "level1": "10000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELV_pres_60000",
+    "grib_name": "RELV",
+    "long_name": "Relative Vorticity",
+    "units": "s-1",
+    "level1": "60000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_hght_100",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "100",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "instant"
+  },
+  {
+    "name": "RH_pres_60000",
+    "grib_name": "RH",
+    "long_name": "Relative Humidity",
+    "units": "%",
+    "level1": "60000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VVEL_pres_70000",
+    "grib_name": "VVEL",
+    "long_name": "Vertical Velocity (Pressure)",
+    "units": "Pa s-1",
+    "level1": "70000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SDEN",
+    "grib_name": "SDEN",
+    "long_name": "Snow Density",
+    "units": "kg m-3",
+    "level1": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "HGT_pres_10000",
+    "grib_name": "HGT",
+    "long_name": "Geopotential Height",
+    "units": "gpm",
+    "level1": "10000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RH_pres_92500",
+    "grib_name": "RH",
+    "long_name": "Relative Humidity",
+    "units": "%",
+    "level1": "92500",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TMP_pres_25000",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "25000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELV_pres_30000",
+    "grib_name": "RELV",
+    "long_name": "Relative Vorticity",
+    "units": "s-1",
+    "level1": "30000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VVEL_pres_100000",
+    "grib_name": "VVEL",
+    "long_name": "Vertical Velocity (Pressure)",
+    "units": "Pa s-1",
+    "level1": "100000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_pres_30000",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "30000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "HGT_pres_100000",
+    "grib_name": "HGT",
+    "long_name": "Geopotential Height",
+    "units": "gpm",
+    "level1": "100000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "HGT_pres_70000",
+    "grib_name": "HGT",
+    "long_name": "Geopotential Height",
+    "units": "gpm",
+    "level1": "70000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELV_pres_92500",
+    "grib_name": "RELV",
+    "long_name": "Relative Vorticity",
+    "units": "s-1",
+    "level1": "92500",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELD_pres_50000",
+    "grib_name": "RELD",
+    "long_name": "Relative Divergence",
+    "units": "s-1",
+    "level1": "50000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_pres_50000",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "50000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TMP_pres_50000",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "50000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_pres_10000",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "10000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "PRES",
+    "grib_name": "PRES",
+    "long_name": "Pressure",
+    "units": "Pa",
+    "level1": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "RELV_pres_10000",
+    "grib_name": "RELV",
+    "long_name": "Relative Vorticity",
+    "units": "s-1",
+    "level1": "10000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "HGT_pres_25000",
+    "grib_name": "HGT",
+    "long_name": "Geopotential Height",
+    "units": "gpm",
+    "level1": "25000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SOILTMP_2",
+    "grib_name": "SOILTMP",
+    "long_name": "Soil Temperature",
+    "units": "K",
+    "level1": "2",
+    "level2": "3",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_hght_100",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "100",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "instant"
+  },
+  {
+    "name": "VVEL_pres_15000",
+    "grib_name": "VVEL",
+    "long_name": "Vertical Velocity (Pressure)",
+    "units": "Pa s-1",
+    "level1": "15000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELV_pres_70000",
+    "grib_name": "RELV",
+    "long_name": "Relative Vorticity",
+    "units": "s-1",
+    "level1": "70000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SPFH_pres_20000",
+    "grib_name": "SPFH",
+    "long_name": "Specific Humidity",
+    "units": "kg kg-1",
+    "level1": "20000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELD_pres_5000",
+    "grib_name": "RELD",
+    "long_name": "Relative Divergence",
+    "units": "s-1",
+    "level1": "5000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_pres_5000",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "5000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "TMP_pres_5000",
+    "grib_name": "TMP",
+    "long_name": "Temperature",
+    "units": "K",
+    "level1": "5000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "Unknown",
+    "grib_name": "Unknown",
+    "long_name": "Unknown",
+    "units": "Unknown",
+    "level1": "-21474836469999998812229598404186556223409515265441265133384503076613184093172954683947688307879100117832869349356531477240836326479101952",
+    "level2": "",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_pres_60000",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "60000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELV_pres_50000",
+    "grib_name": "RELV",
+    "long_name": "Relative Vorticity",
+    "units": "s-1",
+    "level1": "50000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RH_pres_50000",
+    "grib_name": "RH",
+    "long_name": "Relative Humidity",
+    "units": "%",
+    "level1": "50000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SPFH_pres_15000",
+    "grib_name": "SPFH",
+    "long_name": "Specific Humidity",
+    "units": "kg kg-1",
+    "level1": "15000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VSOILM_2",
+    "grib_name": "VSOILM",
+    "long_name": "Volumetric Soil Moisture",
+    "units": "m3 m-3",
+    "level1": "1",
+    "level2": "2",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "UGRD_pres_5000",
+    "grib_name": "UGRD",
+    "long_name": "U-Component of Wind",
+    "units": "m s-1",
+    "level1": "5000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VSOILM_3",
+    "grib_name": "VSOILM",
+    "long_name": "Volumetric Soil Moisture",
+    "units": "m3 m-3",
+    "level1": "2",
+    "level2": "3",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "VGRD_hght_10",
+    "grib_name": "VGRD",
+    "long_name": "V-Component of Wind",
+    "units": "m s-1",
+    "level1": "10",
+    "level2": "",
+    "level_type": "HGHT",
+    "type": "instant"
+  },
+  {
+    "name": "RELD_pres_30000",
+    "grib_name": "RELD",
+    "long_name": "Relative Divergence",
+    "units": "s-1",
+    "level1": "30000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "RELD_pres_60000",
+    "grib_name": "RELD",
+    "long_name": "Relative Divergence",
+    "units": "s-1",
+    "level1": "60000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "HGT_pres_50000",
+    "grib_name": "HGT",
+    "long_name": "Geopotential Height",
+    "units": "gpm",
+    "level1": "50000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "VSOILM",
+    "grib_name": "VSOILM",
+    "long_name": "Volumetric Soil Moisture",
+    "units": "m3 m-3",
+    "level1": "0",
+    "level2": "1",
+    "level_type": "",
+    "type": "instant"
+  },
+  {
+    "name": "VVEL_pres_92500",
+    "grib_name": "VVEL",
+    "long_name": "Vertical Velocity (Pressure)",
+    "units": "Pa s-1",
+    "level1": "92500",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  },
+  {
+    "name": "SPFH_pres_50000",
+    "grib_name": "SPFH",
+    "long_name": "Specific Humidity",
+    "units": "kg kg-1",
+    "level1": "50000",
+    "level2": "",
+    "level_type": "PRES",
+    "type": "instant"
+  }
+]
