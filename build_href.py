@@ -218,25 +218,26 @@ def configure_dask_runtime(
 
     if _DASK_DISTRIBUTED_AVAILABLE and Client is not None and LocalCluster is not None:
         try:
-            # For HPC/Slurm environments, explicitly set memory limit per worker to avoid
-            # dask auto-detecting an absurdly small limit from cgroups or resource constraints.
-            # Use 2GB per worker as a safe default for typical ensemble workloads.
-            memory_limit_per_worker = "2GB"
-            
+            # In HPC/Slurm environments with cgroups, dask.distributed's memory auto-detection
+            # from cgroup limits often yields absurdly small values (e.g., 1 MiB) that conflict
+            # with actual available RAM. Disable memory management entirely (memory_limit=None)
+            # and turn off the monitor to avoid spurious worker pauses.
             cluster = LocalCluster(
                 n_workers=num_workers,
                 threads_per_worker=threads,
                 processes=False,
                 dashboard_address=None,
-                memory_limit=memory_limit_per_worker,
+                memory_limit=None,  # Disable dask memory management in HPC/cgroup environments
             )
-            client = Client(cluster)
+            # Disable worker memory monitoring to prevent spurious pauses from cgroup misconfiguration
+            with dask.config.set({"distributed.worker.memory.monitor": False}):
+                client = Client(cluster)
+            
             logger.info(
-                "Configured local dask.distributed runtime: workers=%d, threads/worker=%d, total_threads=%d, memory/worker=%s",
+                "Configured local dask.distributed runtime: workers=%d, threads/worker=%d, total_threads=%d (memory management disabled for HPC)",
                 num_workers,
                 threads,
                 num_workers * threads,
-                memory_limit_per_worker,
             )
             return client
         except Exception as exc:  # noqa: BLE001
