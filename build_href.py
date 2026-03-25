@@ -497,6 +497,28 @@ def ensemble_mean(
 # 2b. Rolling N-hour ensemble extremes
 # ---------------------------------------------------------------------------
 
+def _precomputed_rolling_var_name(
+    var_name: str,
+    window_hours: int,
+    *,
+    extrema_kind: str,
+) -> str | None:
+    """Return expected precomputed rolling-extrema member variable name.
+
+    Member stores can include precomputed variables such as
+    ``*_max_4h`` / ``*_min_4h`` derived from ``*_max_1h`` / ``*_min_1h``.
+    """
+    if window_hours <= 1:
+        return None
+    if extrema_kind == "max" and "_max_" not in var_name:
+        return None
+    if extrema_kind == "min" and "_min_" not in var_name:
+        return None
+    candidate = var_name.replace("_1h", f"_{window_hours}h")
+    if candidate == var_name:
+        return None
+    return candidate
+
 def rolling_window_ens_max(
     ds: xr.Dataset,
     var_name: str,
@@ -515,24 +537,36 @@ def rolling_window_ens_max(
     ``MXUPHL_hght_5000_2000_max_1h``) into a *window_hours*-hour running
     maximum of the ensemble envelope.
     """
-    # Temporal rolling max per member → (time, member, y, x)
-    source = ds[var_name]
+    # Prefer precomputed member rolling maxima from member stores when present.
+    source_var = var_name
+    precomputed_name = _precomputed_rolling_var_name(var_name, window_hours, extrema_kind="max")
+    if precomputed_name is not None and precomputed_name in ds.data_vars:
+        source_var = precomputed_name
+        logger.debug("Using precomputed rolling member max %s for %s", source_var, var_name)
+
+    source = ds[source_var]
     if transform is not None:
         source = transform(source)
 
-    ens_max = ensemble_calc.rolling_ensemble_max(
-        source,
-        window=window_hours,
-        member_dim=MEMBER_DIM,
-        time_dim=TIME_DIM,
-        min_periods=1,
-    )
+    if source_var == var_name:
+        ens_max = ensemble_calc.rolling_ensemble_max(
+            source,
+            window=window_hours,
+            member_dim=MEMBER_DIM,
+            time_dim=TIME_DIM,
+            min_periods=1,
+        )
+    else:
+        # Source is already member-level rolling max; only reduce over members.
+        ens_max = ensemble_calc.max_field(source, member_dim=MEMBER_DIM)
+
     ens_max.name = f"max{window_hours}h_{var_name}"
     ens_max.attrs.update(
         {
             "long_name": f"{window_hours}-hr ensemble maximum {long_name}",
             "units": source.attrs.get("units", ""),
             "source_variable": var_name,
+            "source_variable_effective": source_var,
             "window_hours": window_hours,
             "stat": f"rolling_{window_hours}h_ens_max",
         }
@@ -553,23 +587,36 @@ def rolling_window_ens_min(
     temporal rolling min for minimum-valued fields such as the anti-cyclonic
     updraft helicity (``MNUPHL``) and downward vertical velocity (``MAXDVV``).
     """
-    source = ds[var_name]
+    # Prefer precomputed member rolling minima from member stores when present.
+    source_var = var_name
+    precomputed_name = _precomputed_rolling_var_name(var_name, window_hours, extrema_kind="min")
+    if precomputed_name is not None and precomputed_name in ds.data_vars:
+        source_var = precomputed_name
+        logger.debug("Using precomputed rolling member min %s for %s", source_var, var_name)
+
+    source = ds[source_var]
     if transform is not None:
         source = transform(source)
 
-    ens_min = ensemble_calc.rolling_ensemble_min(
-        source,
-        window=window_hours,
-        member_dim=MEMBER_DIM,
-        time_dim=TIME_DIM,
-        min_periods=1,
-    )
+    if source_var == var_name:
+        ens_min = ensemble_calc.rolling_ensemble_min(
+            source,
+            window=window_hours,
+            member_dim=MEMBER_DIM,
+            time_dim=TIME_DIM,
+            min_periods=1,
+        )
+    else:
+        # Source is already member-level rolling min; only reduce over members.
+        ens_min = ensemble_calc.min_field(source, member_dim=MEMBER_DIM)
+
     ens_min.name = f"min{window_hours}h_{var_name}"
     ens_min.attrs.update(
         {
             "long_name": f"{window_hours}-hr ensemble minimum {long_name}",
             "units": source.attrs.get("units", ""),
             "source_variable": var_name,
+            "source_variable_effective": source_var,
             "window_hours": window_hours,
             "stat": f"rolling_{window_hours}h_ens_min",
         }
@@ -580,6 +627,33 @@ def rolling_window_ens_min(
 # ---------------------------------------------------------------------------
 # 2c. Neighbourhood exceedance probability
 # ---------------------------------------------------------------------------
+
+from scipy.ndimage import maximum_filter
+
+def circular_footprint(radius):
+    """Create a 2D circular (disk) footprint for maximum_filter."""
+    L = np.arange(-radius, radius+1)
+    X, Y = np.meshgrid(L, L)
+    return (X**2 + Y**2) <= radius**2
+
+def apply_maximum_filter_xarray(da, km_radius=40, km_spacing=3):
+    radius = int(np.round(km_radius / km_spacing))
+    footprint = circular_footprint(radius)
+    # Apply filter across (x, y) for each time step
+    def filter_func(arr):
+        return maximum_filter(arr, footprint=footprint, mode='nearest')
+    # Use xarray's apply_ufunc to vectorize over 'time'
+    filtered = xr.apply_ufunc(
+        filter_func,
+        da,
+        input_core_dims=[['x', 'y']],
+        output_core_dims=[['x', 'y']],
+        vectorize=True,
+        dask='parallelized',
+        output_dtypes=[da.dtype],
+        dask_gufunc_kwargs={'allow_rechunk': True}
+    )
+    return filtered
 
 def neighbourhood_probability(
     ds: xr.Dataset,
@@ -642,18 +716,27 @@ def neighbourhood_probability(
 
     # Rolling max over time window → shape (time, member, y, x)
     # Cache this when running multiple thresholds for the same variable.
-    cache_key = (var_name, window_hours, "transformed" if transform is not None else "raw")
+    source_var = var_name
+    precomputed_name = _precomputed_rolling_var_name(var_name, window_hours, extrema_kind="max")
+    if precomputed_name is not None and precomputed_name in ds.data_vars:
+        source_var = precomputed_name
+        logger.debug("Using precomputed rolling member max %s for neighbourhood %s", source_var, var_name)
+
+    cache_key = (source_var, window_hours, "transformed" if transform is not None else "raw")
     if rolling_cache is not None and cache_key in rolling_cache:
         rolling_max = rolling_cache[cache_key]
     else:
-        source = ds[var_name]
+        source = ds[source_var]
         if transform is not None:
             source = transform(source)
-        rolling_max = (
-            source
-            .rolling({TIME_DIM: window_hours}, min_periods=1)
-            .max()
-        )
+        if source_var == var_name:
+            rolling_max = (
+                source
+                .rolling({TIME_DIM: window_hours}, min_periods=1)
+                .max()
+            )
+        else:
+            rolling_max = source
         if rolling_cache is not None:
             rolling_cache[cache_key] = rolling_max
 

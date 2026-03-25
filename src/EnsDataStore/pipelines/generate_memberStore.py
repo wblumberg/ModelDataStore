@@ -186,6 +186,12 @@ def write_member_zarr(
         except Exception as exc:
             logger.error("Error reading %s: %s", forecast_file.path, exc)
 
+    _create_member_rolling_extrema(
+        root=root,
+        variables=variables,
+        window_hours=4,
+    )
+
     source_cycle_values = np.array(source_cycles, dtype="datetime64[ns]")
     root.create_array(
         "source_cycle_time",
@@ -208,6 +214,76 @@ def write_member_zarr(
     logger.info("Completed %s assignments", total_assignments)
     zarr.consolidate_metadata(store)
     logger.info("Member Zarr store written with consolidated metadata")
+
+
+def _create_member_rolling_extrema(
+    *,
+    root: zarr.Group,
+    variables: Sequence[VariableInfo],
+    window_hours: int = 4,
+) -> None:
+    """Create per-member rolling extrema fields used by downstream ensemble pipelines.
+
+    This precomputes member-level rolling max/min once at member-store build time,
+    so ensemble post-processing can avoid repeating temporal rolling over every
+    member for each product.
+    """
+    logger = logging.getLogger(__name__)
+    if window_hours < 1:
+        raise ValueError("window_hours must be >= 1")
+
+    for variable in variables:
+        if variable.type not in {"max_1h", "min_1h"}:
+            continue
+        if variable.name not in root:
+            continue
+
+        source_name = variable.name
+        derived_name = source_name.replace("_1h", f"_{window_hours}h")
+        if derived_name in root:
+            logger.info("Derived variable %s already exists; skipping", derived_name)
+            continue
+
+        source_arr = root[source_name]
+        logger.info("Creating derived rolling variable %s from %s", derived_name, source_name)
+
+        # Source layout: (time, member, y, x) where member size is 1.
+        source_data = source_arr[:, 0, :, :]
+        rolled_data = np.empty_like(source_data, dtype=np.float32)
+
+        reducer = np.nanmax if variable.type.startswith("max") else np.nanmin
+        for t in range(source_data.shape[0]):
+            start = max(0, t - window_hours + 1)
+            rolled_data[t, :, :] = reducer(source_data[start : t + 1, :, :], axis=0)
+
+        compressor = source_arr.compressor if source_arr.compressor is not None else Blosc(cname="zstd", clevel=5)
+        root.create_array(
+            derived_name,
+            shape=source_arr.shape,
+            chunks=source_arr.chunks,
+            dtype=np.float32,
+            fill_value=np.float32(np.nan),
+            compressor=compressor,
+        )
+        root[derived_name][:, 0, :, :] = rolled_data
+
+        extrema_label = "maximum" if variable.type.startswith("max") else "minimum"
+        root[derived_name].attrs.update(
+            {
+                "long_name": f"{window_hours}-hr rolling member {extrema_label} {variable.long_name}",
+                "units": variable.units,
+                "level1": variable.level1,
+                "level2": variable.level2,
+                "level_type": variable.level_type,
+                "grib_name": variable.grib_name,
+                "type": f"{variable.type.split('_', maxsplit=1)[0]}_{window_hours}h",
+                "is_run_accumulated": bool(variable.type.startswith("accum")),
+                "accumulation_hours": window_hours,
+                "derived_from": source_name,
+                "window_hours": window_hours,
+                "_ARRAY_DIMENSIONS": ["time", "member", "y", "x"],
+            }
+        )
 
 
 def build_member_store(
