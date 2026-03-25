@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Sequence
@@ -46,6 +47,12 @@ from typing import Callable, Sequence
 import numpy as np
 import xarray as xr
 import zarr
+
+SRC_DIR = Path(__file__).resolve().parent / "src"
+if SRC_DIR.exists() and str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from EnsDataStore.calc import ensemble as ensemble_calc
 
 try:
     import pint
@@ -56,23 +63,6 @@ try:
 except ImportError:
     _PINT_AVAILABLE = False
     _UNIT_REGISTRY = None
-
-try:
-    import dask.array as da
-    _DASK_AVAILABLE = True
-except ImportError:
-    _DASK_AVAILABLE = False
-
-# ---------------------------------------------------------------------------
-# Optional scipy import – only required for neighbourhood probability.
-# If scipy is not installed the NP products are skipped with a warning.
-# ---------------------------------------------------------------------------
-try:
-    from scipy.ndimage import gaussian_filter as _scipy_gaussian_filter
-    from scipy.ndimage import maximum_filter as _scipy_max_filter
-    _SCIPY_AVAILABLE = True
-except ImportError:
-    _SCIPY_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -245,6 +235,7 @@ def _collect_grid_attrs_from_members(
                 selected,
                 observed[0][0].name,
             )
+            
 
     return grid_attrs
 
@@ -369,6 +360,8 @@ def build_time_lagged_ensemble(
         ensemble.sizes.get(X_DIM, "?"),
         ensemble.sizes.get(Y_DIM, "?"),
     )
+    
+    # This dataset is the source for all subsequent post-processing steps, so we return it from this function and pass it to the product functions defined below.  The products are responsible for selecting and transforming the relevant variables from the full ensemble dataset as needed.
     return ensemble
 
 
@@ -404,7 +397,7 @@ def ensemble_mean(
     source = ds[var_name]
     if transform is not None:
         source = transform(source)
-    da = source.mean(dim=MEMBER_DIM, skipna=True)
+    da = ensemble_calc.mean_field(source, member_dim=MEMBER_DIM)
     da.name = f"mean_{var_name}"
     da.attrs.update(
         {
@@ -444,13 +437,13 @@ def rolling_window_ens_max(
     if transform is not None:
         source = transform(source)
 
-    member_rolling_max = (
-        source
-        .rolling({TIME_DIM: window_hours}, min_periods=1)
-        .max()
+    ens_max = ensemble_calc.rolling_ensemble_max(
+        source,
+        window=window_hours,
+        member_dim=MEMBER_DIM,
+        time_dim=TIME_DIM,
+        min_periods=1,
     )
-    # Ensemble max over members → (time, y, x)
-    ens_max = member_rolling_max.max(dim=MEMBER_DIM, skipna=True)
     ens_max.name = f"max{window_hours}h_{var_name}"
     ens_max.attrs.update(
         {
@@ -481,12 +474,13 @@ def rolling_window_ens_min(
     if transform is not None:
         source = transform(source)
 
-    member_rolling_min = (
-        source
-        .rolling({TIME_DIM: window_hours}, min_periods=1)
-        .min()
+    ens_min = ensemble_calc.rolling_ensemble_min(
+        source,
+        window=window_hours,
+        member_dim=MEMBER_DIM,
+        time_dim=TIME_DIM,
+        min_periods=1,
     )
-    ens_min = member_rolling_min.min(dim=MEMBER_DIM, skipna=True)
     ens_min.name = f"min{window_hours}h_{var_name}"
     ens_min.attrs.update(
         {
@@ -503,20 +497,6 @@ def rolling_window_ens_min(
 # ---------------------------------------------------------------------------
 # 2c. Neighbourhood exceedance probability
 # ---------------------------------------------------------------------------
-
-def _build_disk_kernel(radius_gridpoints: int) -> np.ndarray:
-    """Return a boolean disk structuring element with radius in grid points.
-
-    The kernel is used as a footprint for scipy's maximum_filter so that a
-    grid point is considered "exceeded" if *any* point within the disk
-    exceeds the threshold.
-    """
-    size = 2 * radius_gridpoints + 1
-    cy, cx = radius_gridpoints, radius_gridpoints
-    y_idx, x_idx = np.ogrid[:size, :size]
-    dist = np.sqrt((y_idx - cy) ** 2 + (x_idx - cx) ** 2)
-    return (dist <= radius_gridpoints).astype(np.float64)
-
 
 def neighbourhood_probability(
     ds: xr.Dataset,
@@ -569,24 +549,13 @@ def neighbourhood_probability(
     strict:
         If ``True`` use strict greater-than (>); otherwise use ≥.
     """
-    if not _SCIPY_AVAILABLE:
+    if not ensemble_calc.SCIPY_AVAILABLE:
         logger.warning(
             "scipy not available – skipping neighbourhood probability for %s > %g",
             var_name,
             threshold,
         )
         return None
-
-    radius_gp = max(1, round(radius_km / grid_spacing_km))
-    kernel = _build_disk_kernel(radius_gp)
-    logger.debug(
-        "NB kernel: radius=%.0f km / %.1f km/gp → %d gp, footprint=%dx%d",
-        radius_km,
-        grid_spacing_km,
-        radius_gp,
-        kernel.shape[0],
-        kernel.shape[1],
-    )
 
     # Rolling max over time window → shape (time, member, y, x)
     # Cache this when running multiple thresholds for the same variable.
@@ -605,91 +574,18 @@ def neighbourhood_probability(
         if rolling_cache is not None:
             rolling_cache[cache_key] = rolling_max
 
-    # Binary exceedance mask; keep this lazy (dask-backed) and chunk-aware.
-    exceedance = rolling_max > threshold if strict else rolling_max >= threshold
-    exceedance = exceedance.transpose(MEMBER_DIM, TIME_DIM, Y_DIM, X_DIM).astype(np.float32)
-
-    footprint_4d = kernel.astype(bool)[np.newaxis, np.newaxis, :, :]
-
-    # Use dask.map_overlap for chunk-aware spatial neighbourhood filtering.
-    # Depth is only in y/x so time/member chunking is preserved.
-    if _DASK_AVAILABLE and hasattr(exceedance.data, "map_overlap"):
-        axis_y = exceedance.get_axis_num(Y_DIM)
-        axis_x = exceedance.get_axis_num(X_DIM)
-
-        hit_data = da.map_overlap(
-            lambda block: _scipy_max_filter(
-                block,
-                footprint=footprint_4d,
-                mode="constant",
-                cval=0.0,
-            ),
-            exceedance.data,
-            depth={axis_y: radius_gp, axis_x: radius_gp},
-            boundary={axis_y: 0.0, axis_x: 0.0},
-            dtype=np.float32,
-            trim=True,
-        )
-        hit_mask = xr.DataArray(
-            hit_data,
-            dims=exceedance.dims,
-            coords=exceedance.coords,
-            attrs=exceedance.attrs,
-            name=exceedance.name,
-        )
-    else:
-        # NumPy fallback path when dask isn't available.
-        hit_np = _scipy_max_filter(
-            exceedance.values,
-            footprint=footprint_4d,
-            mode="constant",
-            cval=0.0,
-        )
-        hit_mask = xr.DataArray(
-            hit_np,
-            dims=exceedance.dims,
-            coords=exceedance.coords,
-            attrs=exceedance.attrs,
-            name=exceedance.name,
-        )
-
-    # Fraction of members with a neighbourhood hit at each (time, y, x).
-    prob_fraction = (hit_mask >= 1.0).mean(dim=MEMBER_DIM, skipna=True).astype(np.float32)
-
-    # Convert to percentage and smooth with a 2-D Gaussian kernel.
-    # Smoothing parameter is 40 km -> sigma in grid points.
-    sigma_gp = float(radius_km / grid_spacing_km)
-    prob_percent = prob_fraction * 100.0
-
-    if _DASK_AVAILABLE and hasattr(prob_percent.data, "map_overlap"):
-        axis_y = prob_percent.get_axis_num(Y_DIM)
-        axis_x = prob_percent.get_axis_num(X_DIM)
-        depth = int(np.ceil(3.0 * sigma_gp))
-        smooth_data = da.map_overlap(
-            lambda block: _scipy_gaussian_filter(block, sigma=(0.0, sigma_gp, sigma_gp), mode="nearest"),
-            prob_percent.data,
-            depth={axis_y: depth, axis_x: depth},
-            boundary={axis_y: "nearest", axis_x: "nearest"},
-            dtype=np.float32,
-            trim=True,
-        )
-        out = xr.DataArray(
-            smooth_data,
-            dims=prob_percent.dims,
-            coords=prob_percent.coords,
-            attrs=prob_percent.attrs,
-            name=prob_percent.name,
-        )
-    else:
-        out = xr.DataArray(
-            _scipy_gaussian_filter(prob_percent.values, sigma=(0.0, sigma_gp, sigma_gp), mode="nearest"),
-            dims=prob_percent.dims,
-            coords=prob_percent.coords,
-            attrs=prob_percent.attrs,
-            name=prob_percent.name,
-        )
-
-    out = out.clip(min=0.0, max=100.0).astype(np.float32)
+    out = ensemble_calc.neighborhood_probability_smoothed(
+        rolling_max,
+        threshold=threshold,
+        member_dim=MEMBER_DIM,
+        y_dim=Y_DIM,
+        x_dim=X_DIM,
+        radius_km=radius_km,
+        grid_spacing_km=grid_spacing_km,
+        strict=strict,
+        smooth_sigma_km=radius_km,
+        percentage=True,
+    )
 
     thresh_str = f"{int(threshold)}" if threshold == int(threshold) else f"{threshold}"
     out.name = (
@@ -789,7 +685,7 @@ def build_product_list(
     # Product list -------------------------------------------------------------
     # Each dict requires only the "fn" key.  Add more keys (e.g. "priority")
     # if you later need to filter or order products programmatically.
-products: list[dict[str, Callable]] = [
+    products: list[dict[str, Callable]] = [
 
         # ------------------------------------------------------------------ #
         # Ensemble mean fields                                                #

@@ -9,6 +9,19 @@ from typing import Mapping, Sequence
 import numpy as np
 import xarray as xr
 
+try:
+    import dask.array as dask_array
+    DASK_AVAILABLE = True
+except ImportError:
+    DASK_AVAILABLE = False
+
+try:
+    from scipy.ndimage import gaussian_filter as _scipy_gaussian_filter
+    from scipy.ndimage import maximum_filter as _scipy_max_filter
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
+
 
 DEFAULT_MEMBER_CANDIDATES: tuple[str, ...] = (
     "member",
@@ -310,6 +323,188 @@ def rolling_window_max(
 
     required = window if min_periods is None else min_periods
     return da.rolling({time_dim: window}, min_periods=required).max()
+
+
+def rolling_window_min(
+    da: xr.DataArray,
+    window: int,
+    time_dim: str = "time",
+    min_periods: int | None = None,
+) -> xr.DataArray:
+    if window < 1:
+        raise ValueError("window must be >= 1")
+
+    required = window if min_periods is None else min_periods
+    return da.rolling({time_dim: window}, min_periods=required).min()
+
+
+def rolling_ensemble_max(
+    da: xr.DataArray,
+    window: int,
+    *,
+    member_dim: str = "member",
+    time_dim: str = "time",
+    min_periods: int = 1,
+) -> xr.DataArray:
+    member_rolling = rolling_window_max(
+        da,
+        window=window,
+        time_dim=time_dim,
+        min_periods=min_periods,
+    )
+    return max_field(member_rolling, member_dim=member_dim)
+
+
+def rolling_ensemble_min(
+    da: xr.DataArray,
+    window: int,
+    *,
+    member_dim: str = "member",
+    time_dim: str = "time",
+    min_periods: int = 1,
+) -> xr.DataArray:
+    member_rolling = rolling_window_min(
+        da,
+        window=window,
+        time_dim=time_dim,
+        min_periods=min_periods,
+    )
+    return min_field(member_rolling, member_dim=member_dim)
+
+
+def _build_disk_kernel(radius_gridpoints: int) -> np.ndarray:
+    size = 2 * radius_gridpoints + 1
+    cy, cx = radius_gridpoints, radius_gridpoints
+    y_idx, x_idx = np.ogrid[:size, :size]
+    dist = np.sqrt((y_idx - cy) ** 2 + (x_idx - cx) ** 2)
+    return (dist <= radius_gridpoints).astype(bool)
+
+
+def neighborhood_probability_smoothed(
+    da: xr.DataArray,
+    threshold: float,
+    *,
+    member_dim: str = "member",
+    y_dim: str = "y",
+    x_dim: str = "x",
+    radius_km: float = 40.0,
+    grid_spacing_km: float = 3.0,
+    strict: bool = True,
+    smooth_sigma_km: float | None = 40.0,
+    percentage: bool = True,
+) -> xr.DataArray:
+    if not SCIPY_AVAILABLE:
+        raise RuntimeError("scipy is required for neighbourhood probability diagnostics")
+
+    radius_gp = max(1, round(radius_km / grid_spacing_km))
+    kernel_2d = _build_disk_kernel(radius_gp)
+
+    if member_dim not in da.dims:
+        raise ValueError(f"member_dim '{member_dim}' not found in dims {da.dims}")
+    if y_dim not in da.dims or x_dim not in da.dims:
+        raise ValueError(f"Expected y/x dims '{y_dim}'/'{x_dim}' in dims {da.dims}")
+
+    ordered_dims = [d for d in da.dims if d not in (y_dim, x_dim)] + [y_dim, x_dim]
+    exceedance = (da > threshold) if strict else (da >= threshold)
+    exceedance = exceedance.transpose(*ordered_dims).astype(np.float32)
+
+    footprint_shape = [1] * exceedance.ndim
+    footprint_shape[-2] = kernel_2d.shape[0]
+    footprint_shape[-1] = kernel_2d.shape[1]
+    footprint = np.zeros(footprint_shape, dtype=bool)
+    footprint[(0,) * (exceedance.ndim - 2) + (slice(None), slice(None))] = kernel_2d
+
+    axis_y = exceedance.get_axis_num(y_dim)
+    axis_x = exceedance.get_axis_num(x_dim)
+
+    if DASK_AVAILABLE and hasattr(exceedance.data, "map_overlap"):
+        hit_data = dask_array.map_overlap(
+            lambda block: _scipy_max_filter(
+                block,
+                footprint=footprint,
+                mode="constant",
+                cval=0.0,
+            ),
+            exceedance.data,
+            depth={axis_y: radius_gp, axis_x: radius_gp},
+            boundary={axis_y: 0.0, axis_x: 0.0},
+            dtype=np.float32,
+            trim=True,
+        )
+        hit_mask = xr.DataArray(
+            hit_data,
+            dims=exceedance.dims,
+            coords=exceedance.coords,
+            attrs=exceedance.attrs,
+            name=exceedance.name,
+        )
+    else:
+        hit_np = _scipy_max_filter(
+            exceedance.values,
+            footprint=footprint,
+            mode="constant",
+            cval=0.0,
+        )
+        hit_mask = xr.DataArray(
+            hit_np,
+            dims=exceedance.dims,
+            coords=exceedance.coords,
+            attrs=exceedance.attrs,
+            name=exceedance.name,
+        )
+
+    out = probability_exceedance(
+        hit_mask,
+        threshold=0.5,
+        member_dim=member_dim,
+        strict=False,
+    ).astype(np.float32)
+
+    if percentage:
+        out = out * 100.0
+
+    if smooth_sigma_km is not None and smooth_sigma_km > 0:
+        sigma_gp = float(smooth_sigma_km / grid_spacing_km)
+        if DASK_AVAILABLE and hasattr(out.data, "map_overlap"):
+            axis_y = out.get_axis_num(y_dim)
+            axis_x = out.get_axis_num(x_dim)
+            depth = int(np.ceil(3.0 * sigma_gp))
+            sigma = [0.0] * out.ndim
+            sigma[axis_y] = sigma_gp
+            sigma[axis_x] = sigma_gp
+            smooth_data = dask_array.map_overlap(
+                lambda block: _scipy_gaussian_filter(block, sigma=tuple(sigma), mode="nearest"),
+                out.data,
+                depth={axis_y: depth, axis_x: depth},
+                boundary={axis_y: "nearest", axis_x: "nearest"},
+                dtype=np.float32,
+                trim=True,
+            )
+            out = xr.DataArray(
+                smooth_data,
+                dims=out.dims,
+                coords=out.coords,
+                attrs=out.attrs,
+                name=out.name,
+            )
+        else:
+            sigma = [0.0] * out.ndim
+            sigma[out.get_axis_num(y_dim)] = sigma_gp
+            sigma[out.get_axis_num(x_dim)] = sigma_gp
+            out = xr.DataArray(
+                _scipy_gaussian_filter(out.values, sigma=tuple(sigma), mode="nearest"),
+                dims=out.dims,
+                coords=out.coords,
+                attrs=out.attrs,
+                name=out.name,
+            )
+
+    if percentage:
+        out = out.clip(min=0.0, max=100.0)
+    else:
+        out = out.clip(min=0.0, max=1.0)
+
+    return out.astype(np.float32)
 
 
 def neighborhood_max(
