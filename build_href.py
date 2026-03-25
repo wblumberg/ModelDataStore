@@ -40,6 +40,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -936,6 +937,15 @@ def write_href_stats(
     keep_float32 = {name for name in (keep_float32_vars or []) if name}
     compressor = Blosc(cname=compression_codec, clevel=int(compression_level), shuffle=Blosc.BITSHUFFLE)
 
+    # Ensure stale or partially-written keys from previous runs do not
+    # pollute hierarchy scans or trigger component warnings during appends.
+    if output_path.exists():
+        logger.info("Removing existing output store before write: %s", output_path)
+        if output_path.is_dir():
+            shutil.rmtree(output_path)
+        else:
+            output_path.unlink()
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     logger.info(
         "Writing output Zarr store to %s with chunks (time=%d, y=%d, x=%d) …",
@@ -1151,7 +1161,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--time-chunk",
         type=int,
-        default=1,
+        default=4,
         help="Output write chunk size for the time dimension",
     )
     parser.add_argument(
@@ -1203,6 +1213,14 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=1,
         help="Threads per Dask worker when --dask-num-workers > 0",
+    )
+    parser.add_argument(
+        "--persist-before-write",
+        action="store_true",
+        help=(
+            "Persist Step 2 results before Step 3. This can prevent expensive "
+            "re-computation when writing one variable at a time"
+        ),
     )
     return parser
 
@@ -1258,6 +1276,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             len(stats.data_vars),
             stats.attrs["n_members"],
         )
+
+        if args.persist_before_write:
+            persist_start = perf_counter()
+            logger.info("=== Step 2b: Persisting computed products before write ===")
+            stats = stats.persist()
+            logger.info(
+                "Persist submitted in %.2fs (computation may continue asynchronously)",
+                perf_counter() - persist_start,
+            )
 
         # ------------------------------------------------------------------
         # Step 3: Write the output Zarr store
