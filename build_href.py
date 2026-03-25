@@ -47,6 +47,7 @@ from typing import Callable, Sequence
 import numpy as np
 import xarray as xr
 import zarr
+from numcodecs import Blosc
 
 SRC_DIR = Path(__file__).resolve().parent / "src"
 if SRC_DIR.exists() and str(SRC_DIR) not in sys.path:
@@ -845,6 +846,10 @@ def write_href_stats(
     time_chunk: int = 4,
     y_chunk: int = 384,
     x_chunk: int = 384,
+    float_dtype: str = "float16",
+    keep_float32_vars: Sequence[str] | None = None,
+    compression_codec: str = "zstd",
+    compression_level: int = 5,
 ) -> None:
     """Write the statistics Dataset to a consolidated Zarr v2 store.
 
@@ -860,6 +865,8 @@ def write_href_stats(
         X_DIM: x_chunk,
     }
     stats_ds = stats_ds.chunk(chunk_spec)
+    keep_float32 = {name for name in (keep_float32_vars or []) if name}
+    compressor = Blosc(cname=compression_codec, clevel=int(compression_level), shuffle=Blosc.BITSHUFFLE)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     logger.info(
@@ -948,11 +955,32 @@ def write_href_stats(
 
     for idx, var_name in enumerate(data_var_names, start=1):
         var_ds = xr.Dataset({var_name: stats_ds[var_name]})
+
+        # Probability outputs are stored as integer percent [0, 100] to
+        # reduce disk footprint while preserving practical precision.
+        if var_name.startswith("prob_"):
+            var_ds[var_name] = (
+                var_ds[var_name]
+                .clip(min=0.0, max=100.0)
+                .round()
+                .astype(np.uint8)
+            )
+
         # Keep root attrs stable across append writes. Some xarray/zarr paths
         # can replace store attrs with attrs from the incoming dataset.
         var_ds.attrs.update(stats_ds.attrs)
         var_ds = _sanitize_dataset_for_zarr(var_ds)
         var_encoding = _build_zarr_encoding(var_ds, include_coords=(idx == 1))
+
+        # Compression and dtype are configured per data variable.
+        if var_name in var_encoding:
+            var_encoding[var_name]["compressor"] = compressor
+            if var_name.startswith("prob_"):
+                var_encoding[var_name]["dtype"] = "uint8"
+            elif np.issubdtype(stats_ds[var_name].dtype, np.floating):
+                target_dtype = "float32" if var_name in keep_float32 else float_dtype
+                var_encoding[var_name]["dtype"] = target_dtype
+
         logger.info("Writing variable %d/%d: %s", idx, len(stats_ds.data_vars), var_name)
         var_ds.to_zarr(
             str(output_path),
@@ -1037,14 +1065,37 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--y-chunk",
         type=int,
-        default=384,
+        default=353,
         help="Output write chunk size for the y dimension",
-    )
+    ) # 353 x 3 = 1059, which is the full HREF CONUS grid size in y.  This ensures each chunk contains a full latitudinal row, which is ideal for map_overlap operations that need to access neighbouring rows.
     parser.add_argument(
         "--x-chunk",
         type=int,
-        default=384,
+        default=257,
         help="Output write chunk size for the x dimension",
+    ) # 257 x 7 = 1799, which is the full HREF CONUS grid size in x.  This ensures each chunk contains a full longitudinal column, which is ideal for map_overlap operations that need to access neighbouring columns.
+    parser.add_argument(
+        "--float-dtype",
+        choices=("float16", "float32"),
+        default="float16",
+        help="Target dtype for floating-point data variables at write time",
+    )
+    parser.add_argument(
+        "--keep-float32-vars",
+        default="",
+        help="Comma-separated variable names to keep at float32 precision",
+    )
+    parser.add_argument(
+        "--compression-codec",
+        default="zstd",
+        choices=("zstd", "lz4", "zlib", "blosclz"),
+        help="Blosc codec used for output data variables",
+    )
+    parser.add_argument(
+        "--compression-level",
+        type=int,
+        default=5,
+        help="Blosc compression level (0-9)",
     )
     return parser
 
@@ -1098,6 +1149,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         time_chunk=args.time_chunk,
         y_chunk=args.y_chunk,
         x_chunk=args.x_chunk,
+        float_dtype=args.float_dtype,
+        keep_float32_vars=[v.strip() for v in args.keep_float32_vars.split(",") if v.strip()],
+        compression_codec=args.compression_codec,
+        compression_level=args.compression_level,
     )
 
     return 0

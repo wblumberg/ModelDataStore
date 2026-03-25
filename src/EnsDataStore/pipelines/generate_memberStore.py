@@ -141,7 +141,7 @@ def write_member_zarr(
         root.create_array(
             variable.name,
             shape=(len(times), 1, ny, nx),
-            chunks=(1, 1, 256, 256),
+            chunks=(1, 1, 353, 257),
             dtype=np.float32,
             fill_value=np.float32(np.nan),
             compressor=compressor,
