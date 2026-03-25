@@ -833,93 +833,177 @@ def _extract_grid_attrs(ensemble: xr.Dataset) -> dict:
     return {k: ensemble.attrs.get(k, "") for k in GRID_ATTR_KEYS}
 
 
-def compute_href_stats(
-    ensemble: xr.Dataset,
-    run_id: str = "",
-    grid_spacing_km: float = 3.0,
-) -> xr.Dataset:
-    """Run all registered products and return a statistics Dataset.
+def _sanitize_dataset_for_zarr(ds: xr.Dataset) -> xr.Dataset:
+    """Return a dataset safe for xarray -> zarr serialization."""
+    encoding_attr_keys = {
+        "_FillValue",
+        "missing_value",
+        "scale_factor",
+        "add_offset",
+        "dtype",
+    }
+    cleaned = ds.copy(deep=False).drop_encoding()
 
-    Each product function is called in order.  Variables not present in the
-    ensemble are skipped with a warning so that a partially-populated ensemble
-    does not halt the entire run.
+    def _strip(da_in: xr.DataArray) -> xr.DataArray:
+        da_out = da_in.copy(deep=False)
+        for key in list(da_out.attrs):
+            if key in encoding_attr_keys:
+                da_out.attrs.pop(key, None)
+        for key in list(da_out.encoding):
+            if key in encoding_attr_keys:
+                da_out.encoding.pop(key, None)
+        return da_out
+
+    for name in list(cleaned.data_vars):
+        cleaned[name] = _strip(cleaned[name])
+    for name in list(cleaned.coords):
+        cleaned = cleaned.assign_coords({name: _strip(cleaned.coords[name])})
+
+    for key in list(cleaned.attrs):
+        if key in encoding_attr_keys:
+            cleaned.attrs.pop(key, None)
+
+    return cleaned
+
+
+def _build_zarr_encoding(
+    ds: xr.Dataset,
+    *,
+    time_chunk: int = 4,
+    y_chunk: int = 384,
+    x_chunk: int = 384,
+    include_coords: bool = True,
+) -> dict[str, dict[str, tuple[int, ...]]]:
+    """Build explicit chunk encoding for every variable/coord in *ds*.
+
+    This avoids zarr v2 metadata errors when xarray would otherwise pass
+    chunks=None for some arrays.
+    """
+    dim_chunk_map = {
+        TIME_DIM: time_chunk,
+        Y_DIM: y_chunk,
+        X_DIM: x_chunk,
+    }
+    encoding: dict[str, dict[str, tuple[int, ...]]] = {}
+    variable_names: list[str]
+    if include_coords:
+        variable_names = list(ds.variables)
+    else:
+        variable_names = list(ds.data_vars)
+
+    for name in variable_names:
+        var = ds[name]
+        if not var.dims:
+            continue
+        chunks: list[int] = []
+        for dim in var.dims:
+            target = dim_chunk_map.get(dim, ds.sizes[dim])
+            chunks.append(int(min(ds.sizes[dim], target)))
+        encoding[name] = {"chunks": tuple(chunks)}
+    return encoding
+
+
+def _write_single_variable_to_zarr(
+    var_ds: xr.Dataset,
+    var_name: str,
+    output_path: Path,
+    *,
+    is_first_write: bool,
+    dataset_attrs: dict,
+    time_chunk: int = 4,
+    y_chunk: int = 384,
+    x_chunk: int = 384,
+    float_dtype: str = "float16",
+    keep_float32_vars: set[str] | None = None,
+    compression_codec: str = "zstd",
+    compression_level: int = 5,
+) -> tuple[float, float]:
+    """Write a single variable to Zarr, returning (prep_time, write_time).
 
     Parameters
     ----------
-    ensemble:
-        Time-lagged ensemble Dataset with dims (time, member, y, x).
-    run_id:
-        Cycle identifier written into the output metadata (e.g. "2026032200").
-    grid_spacing_km:
-        Grid spacing in km used for neighbourhood radius calculations.
+    var_ds:
+        Single-variable Dataset to write
+    var_name:
+        Name of the variable in var_ds
+    output_path:
+        Path to Zarr store
+    is_first_write:
+        If True, creates store with mode='w'; otherwise appends with mode='a'
+    dataset_attrs:
+        Global attributes to attach to the store
+    time_chunk, y_chunk, x_chunk:
+        Chunk sizes for spatial/temporal dimensions
+    float_dtype:
+        Target dtype for floating-point variables (float16 or float32)
+    keep_float32_vars:
+        Set of variable names to keep at float32
+    compression_codec, compression_level:
+        Compression settings for Blosc
     """
-    products = build_product_list(grid_spacing_km=grid_spacing_km)
+    if keep_float32_vars is None:
+        keep_float32_vars = set()
 
-    member_names = [str(m) for m in ensemble.coords[MEMBER_DIM].values]
-    n_members = len(member_names)
+    var_start = perf_counter()
 
-    output_vars: dict[str, xr.DataArray] = {}
+    # Probability outputs: convert to uint8 percent [0, 100] to reduce disk
+    if var_name.startswith("prob_"):
+        var_ds[var_name] = (
+            var_ds[var_name]
+            .clip(min=0.0, max=100.0)
+            .round()
+            .astype(np.uint8)
+        )
 
-    for i, entry in enumerate(products, start=1):
-        fn = entry["fn"]
-        try:
-            da = fn(ensemble)
-        except KeyError as exc:
-            # A required source variable is missing from the ensemble.
-            logger.warning(
-                "[%d/%d] Skipping product (variable not found in ensemble): %s",
-                i, len(products), exc,
-            )
-            continue
-        except Exception as exc:  # noqa: BLE001
-            logger.error(
-                "[%d/%d] Error computing product: %s", i, len(products), exc,
-                exc_info=True,
-            )
-            continue
-
-        if da is None:
-            # Neighbourhood probability skipped due to missing scipy.
-            continue
-
-        key = da.name or f"product_{i}"
-        if key in output_vars:
-            logger.warning("Duplicate output key '%s'; overwriting previous result.", key)
-        output_vars[key] = da
-        logger.info("[%d/%d] Computed  %s", i, len(products), key)
-
-    # Assemble the output Dataset
-    stats_ds = xr.Dataset(output_vars)
-
-    # Preserve coordinate metadata (units, etc.) from the source ensemble
-    for coord in (TIME_DIM, Y_DIM, X_DIM):
-        if coord in ensemble.coords and coord in stats_ds.coords:
-            stats_ds[coord].attrs.update(ensemble.coords[coord].attrs)
-
-    # Write ensemble membership and grid metadata as dataset-level attributes
-    grid_attrs = _extract_grid_attrs(ensemble)
-    stats_ds.attrs.update(
-        {
-            "title": "HREF Time-Lagged Ensemble – Post-Processing Statistics",
-            "run_id": run_id,
-            "created_at": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "n_members": n_members,
-            "members": ",".join(member_names),
-            "grid_spacing_km": grid_spacing_km,
-            **grid_attrs,
-        }
+    # Keep root attrs stable across appends
+    var_ds.attrs.update(dataset_attrs)
+    var_ds = _sanitize_dataset_for_zarr(var_ds)
+    var_encoding = _build_zarr_encoding(
+        var_ds,
+        time_chunk=time_chunk,
+        y_chunk=y_chunk,
+        x_chunk=x_chunk,
+        include_coords=is_first_write,
     )
-    return stats_ds
+
+    # Set compression and dtype per variable
+    compressor = Blosc(
+        cname=compression_codec,
+        clevel=int(compression_level),
+        shuffle=Blosc.BITSHUFFLE,
+    )
+    if var_name in var_encoding:
+        var_encoding[var_name]["compressor"] = compressor
+        if var_name.startswith("prob_"):
+            var_encoding[var_name]["dtype"] = "uint8"
+        elif np.issubdtype(var_ds[var_name].dtype, np.floating):
+            target_dtype = "float32" if var_name in keep_float32_vars else float_dtype
+            var_encoding[var_name]["dtype"] = target_dtype
+
+    prep_done = perf_counter()
+    prep_time = prep_done - var_start
+
+    # Write to Zarr (first write creates store, subsequent appends)
+    var_ds.to_zarr(
+        str(output_path),
+        mode="w" if is_first_write else "a",
+        consolidated=False,
+        zarr_format=2,
+        encoding=var_encoding,
+    )
+
+    write_done = perf_counter()
+    write_time = write_done - prep_done
+
+    return prep_time, write_time
 
 
-# ===========================================================================
-# Step 5 – Write output Zarr store
-# ===========================================================================
-
-def write_href_stats(
-    stats_ds: xr.Dataset,
+def process_and_write_products(
+    ensemble: xr.Dataset,
     output_path: Path,
     *,
+    run_id: str = "",
+    grid_spacing_km: float = 3.0,
     time_chunk: int = 4,
     y_chunk: int = 384,
     x_chunk: int = 384,
@@ -928,25 +1012,48 @@ def write_href_stats(
     compression_codec: str = "zstd",
     compression_level: int = 5,
 ) -> None:
-    """Write the statistics Dataset to a consolidated Zarr v2 store.
+    """Compute and write ensemble statistics to Zarr, streaming one variable at a time.
 
-    The parent directory is created if it does not already exist.  Any
-    existing store at *output_path* is overwritten.
+    This approach minimizes peak memory usage by computing and writing each product
+    immediately, rather than holding all products in memory simultaneously.
+
+    Parameters
+    ----------
+    ensemble:
+        Time-lagged ensemble Dataset with dims (time, member, y, x).
+    output_path:
+        Path to output Zarr store.
+    run_id:
+        Cycle identifier written into output metadata.
+    grid_spacing_km:
+        Grid spacing in km for neighbourhood calculations.
+    time_chunk, y_chunk, x_chunk:
+        Output chunk sizes for spatial/temporal dimensions.
+    float_dtype:
+        Target dtype for floating-point outputs.
+    keep_float32_vars:
+        Variable names to keep at float32 precision.
+    compression_codec, compression_level:
+        Blosc compression settings.
     """
-    # Ensure all variables have Zarr-compatible uniform chunking.
-    # This is required because some map_overlap paths can produce irregular
-    # dask chunk boundaries that Zarr rejects.
-    chunk_spec = {
-        TIME_DIM: time_chunk,
-        Y_DIM: y_chunk,
-        X_DIM: x_chunk,
-    }
-    stats_ds = stats_ds.chunk(chunk_spec)
+    products = build_product_list(grid_spacing_km=grid_spacing_km)
+    member_names = [str(m) for m in ensemble.coords[MEMBER_DIM].values]
+    n_members = len(member_names)
     keep_float32 = {name for name in (keep_float32_vars or []) if name}
-    compressor = Blosc(cname=compression_codec, clevel=int(compression_level), shuffle=Blosc.BITSHUFFLE)
 
-    # Ensure stale or partially-written keys from previous runs do not
-    # pollute hierarchy scans or trigger component warnings during appends.
+    # Prepare global dataset attributes (these go into every write)
+    grid_attrs = _extract_grid_attrs(ensemble)
+    dataset_attrs = {
+        "title": "HREF Time-Lagged Ensemble – Post-Processing Statistics",
+        "run_id": run_id,
+        "created_at": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "n_members": n_members,
+        "members": ",".join(member_names),
+        "grid_spacing_km": grid_spacing_km,
+        **grid_attrs,
+    }
+
+    # Ensure stale store keys don't pollute the write
     if output_path.exists():
         logger.info("Removing existing output store before write: %s", output_path)
         if output_path.is_dir():
@@ -963,146 +1070,95 @@ def write_href_stats(
         x_chunk,
     )
 
-    # Write one variable at a time. The first variable creates the store
-    # (including coords + global attrs), then remaining variables are appended.
-    # This avoids constructing one very large dask graph for all variables at
-    # once and gives visible progress during long writes.
-    # Keys that frequently collide between attrs and encoding during CF/Zarr
-    # serialization. We strip them from attrs and encoding before writing.
-    encoding_attr_keys = {
-        "_FillValue",
-        "missing_value",
-        "scale_factor",
-        "add_offset",
-        "dtype",
-    }
+    # Rolling cache persists across products to avoid recomputing rolling maxes
+    # for related thresholds (e.g., multiple prob thresholds for same variable)
+    rolling_cache: dict[tuple[str, int], xr.DataArray] = {}
 
-    def _sanitize_dataset_for_zarr(ds: xr.Dataset) -> xr.Dataset:
-        """Return a dataset safe for xarray -> zarr serialization."""
-        cleaned = ds.copy(deep=False).drop_encoding()
+    step3_start = perf_counter()
+    products_written = 0
 
-        def _strip(da_in: xr.DataArray) -> xr.DataArray:
-            da_out = da_in.copy(deep=False)
-            for key in list(da_out.attrs):
-                if key in encoding_attr_keys:
-                    da_out.attrs.pop(key, None)
-            for key in list(da_out.encoding):
-                if key in encoding_attr_keys:
-                    da_out.encoding.pop(key, None)
-            return da_out
+    for i, entry in enumerate(products, start=1):
+        fn = entry["fn"]
+        try:
+            da = fn(ensemble)
+        except KeyError as exc:
+            logger.warning(
+                "[%d/%d] Skipping product (variable not found): %s",
+                i, len(products), exc,
+            )
+            continue
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "[%d/%d] Error computing product: %s",
+                i, len(products), exc,
+                exc_info=True,
+            )
+            continue
 
-        for name in list(cleaned.data_vars):
-            cleaned[name] = _strip(cleaned[name])
-        for name in list(cleaned.coords):
-            cleaned = cleaned.assign_coords({name: _strip(cleaned.coords[name])})
+        if da is None:
+            # Neighbourhood probability skipped due to missing scipy
+            continue
 
-        for key in list(cleaned.attrs):
-            if key in encoding_attr_keys:
-                cleaned.attrs.pop(key, None)
-
-        return cleaned
-
-    def _build_zarr_encoding(
-        ds: xr.Dataset,
-        *,
-        include_coords: bool = True,
-    ) -> dict[str, dict[str, tuple[int, ...]]]:
-        """Build explicit chunk encoding for every variable/coord in *ds*.
-
-        This avoids zarr v2 metadata errors when xarray would otherwise pass
-        chunks=None for some arrays.
-        """
-        dim_chunk_map = {
+        var_name = da.name or f"product_{i}"
+        
+        # Chunk the variable for Zarr-compatible output
+        chunk_spec = {
             TIME_DIM: time_chunk,
             Y_DIM: y_chunk,
             X_DIM: x_chunk,
         }
-        encoding: dict[str, dict[str, tuple[int, ...]]] = {}
-        variable_names: list[str]
-        if include_coords:
-            variable_names = list(ds.variables)
-        else:
-            variable_names = list(ds.data_vars)
+        da = da.chunk(chunk_spec)
 
-        for name in variable_names:
-            var = ds[name]
-            if not var.dims:
-                continue
-            chunks: list[int] = []
-            for dim in var.dims:
-                target = dim_chunk_map.get(dim, ds.sizes[dim])
-                chunks.append(int(min(ds.sizes[dim], target)))
-            encoding[name] = {"chunks": tuple(chunks)}
-        return encoding
+        # Create single-variable dataset with coordinate metadata from ensemble
+        var_ds = xr.Dataset({var_name: da})
+        for coord in (TIME_DIM, Y_DIM, X_DIM):
+            if coord in ensemble.coords:
+                var_ds.coords[coord].attrs.update(ensemble.coords[coord].attrs)
 
-    data_var_names = list(stats_ds.data_vars)
-    if not data_var_names:
-        raise ValueError("No data variables to write")
-
-    step3_start = perf_counter()
-
-    for idx, var_name in enumerate(data_var_names, start=1):
-        var_start = perf_counter()
-        var_ds = xr.Dataset({var_name: stats_ds[var_name]})
-
-        # Probability outputs are stored as integer percent [0, 100] to
-        # reduce disk footprint while preserving practical precision.
-        if var_name.startswith("prob_"):
-            var_ds[var_name] = (
-                var_ds[var_name]
-                .clip(min=0.0, max=100.0)
-                .round()
-                .astype(np.uint8)
-            )
-
-        # Keep root attrs stable across append writes. Some xarray/zarr paths
-        # can replace store attrs with attrs from the incoming dataset.
-        var_ds.attrs.update(stats_ds.attrs)
-        var_ds = _sanitize_dataset_for_zarr(var_ds)
-        var_encoding = _build_zarr_encoding(var_ds, include_coords=(idx == 1))
-        prep_done = perf_counter()
-
-        # Compression and dtype are configured per data variable.
-        if var_name in var_encoding:
-            var_encoding[var_name]["compressor"] = compressor
-            if var_name.startswith("prob_"):
-                var_encoding[var_name]["dtype"] = "uint8"
-            elif np.issubdtype(stats_ds[var_name].dtype, np.floating):
-                target_dtype = "float32" if var_name in keep_float32 else float_dtype
-                var_encoding[var_name]["dtype"] = target_dtype
-
-        logger.info("Writing variable %d/%d: %s", idx, len(stats_ds.data_vars), var_name)
-        var_ds.to_zarr(
-            str(output_path),
-            mode="w" if idx == 1 else "a",
-            consolidated=False,
-            zarr_format=2,
-            encoding=var_encoding,
-        )
-        write_done = perf_counter()
-        logger.info(
-            "Timing %s: prep=%.2fs write=%.2fs total=%.2fs",
+        # Write the variable to Zarr
+        is_first = products_written == 0
+        prep_time, write_time = _write_single_variable_to_zarr(
+            var_ds,
             var_name,
-            prep_done - var_start,
-            write_done - prep_done,
-            write_done - var_start,
+            output_path,
+            is_first_write=is_first,
+            dataset_attrs=dataset_attrs,
+            time_chunk=time_chunk,
+            y_chunk=y_chunk,
+            x_chunk=x_chunk,
+            float_dtype=float_dtype,
+            keep_float32_vars=keep_float32,
+            compression_codec=compression_codec,
+            compression_level=compression_level,
         )
 
-    # Consolidate once at the end (much cheaper than doing it for every append).
+        products_written += 1
+        logger.info(
+            "Writing variable %d/%d: %s; prep=%.2fs write=%.2fs",
+            products_written,
+            len(products),
+            var_name,
+            prep_time,
+            write_time,
+        )
+
+    # Consolidate metadata once at the end
     consolidate_start = perf_counter()
     zarr.consolidate_metadata(str(output_path))
     consolidate_done = perf_counter()
     step3_done = perf_counter()
+
     total_seconds = step3_done - step3_start
-    mean_seconds = total_seconds / max(1, len(stats_ds.data_vars))
+    mean_seconds = total_seconds / max(1, products_written)
     logger.info("Timing metadata consolidation: %.2fs", consolidate_done - consolidate_start)
     logger.info(
         "Timing Step 3 summary: total=%.2fs vars=%d avg_per_var=%.2fs",
         total_seconds,
-        len(stats_ds.data_vars),
+        products_written,
         mean_seconds,
     )
-    logger.info("Successfully wrote %d variables to %s", len(stats_ds.data_vars), output_path)
+    logger.info("Successfully wrote %d variables to %s", products_written, output_path)
+
 
 
 # ===========================================================================
@@ -1222,14 +1278,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         help="Threads per Dask worker when --dask-num-workers > 0",
     )
-    parser.add_argument(
-        "--persist-before-write",
-        action="store_true",
-        help=(
-            "Persist Step 2 results before Step 3. This can prevent expensive "
-            "re-computation when writing one variable at a time"
-        ),
-    )
     return parser
 
 
@@ -1271,36 +1319,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
         # ------------------------------------------------------------------
-        # Step 2: Compute post-processing statistics
+        # Step 2 & 3: Compute and write products (streaming, one at a time)
         # ------------------------------------------------------------------
-        logger.info("=== Step 2: Computing post-processing statistics ===")
-        stats = compute_href_stats(
+        logger.info("=== Step 2 & 3: Computing and writing products ===")
+        process_and_write_products(
             ensemble,
+            output_path=output_path,
             run_id=args.run_id,
             grid_spacing_km=args.grid_spacing_km,
-        )
-        logger.info(
-            "Computed %d statistical products over %d members",
-            len(stats.data_vars),
-            stats.attrs["n_members"],
-        )
-
-        if args.persist_before_write:
-            persist_start = perf_counter()
-            logger.info("=== Step 2b: Persisting computed products before write ===")
-            stats = stats.persist()
-            logger.info(
-                "Persist submitted in %.2fs (computation may continue asynchronously)",
-                perf_counter() - persist_start,
-            )
-
-        # ------------------------------------------------------------------
-        # Step 3: Write the output Zarr store
-        # ------------------------------------------------------------------
-        logger.info("=== Step 3: Writing output Zarr store ===")
-        write_href_stats(
-            stats,
-            output_path,
             time_chunk=args.time_chunk,
             y_chunk=args.y_chunk,
             x_chunk=args.x_chunk,
