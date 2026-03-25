@@ -346,13 +346,15 @@ def rolling_ensemble_max(
     time_dim: str = "time",
     min_periods: int = 1,
 ) -> xr.DataArray:
-    member_rolling = rolling_window_max(
-        da,
+    # Reduce across members first to avoid applying rolling ops to each
+    # individual member field.
+    member_max = max_field(da, member_dim=member_dim)
+    return rolling_window_max(
+        member_max,
         window=window,
         time_dim=time_dim,
         min_periods=min_periods,
     )
-    return max_field(member_rolling, member_dim=member_dim)
 
 
 def rolling_ensemble_min(
@@ -363,13 +365,15 @@ def rolling_ensemble_min(
     time_dim: str = "time",
     min_periods: int = 1,
 ) -> xr.DataArray:
-    member_rolling = rolling_window_min(
-        da,
+    # Reduce across members first to avoid applying rolling ops to each
+    # individual member field.
+    member_min = min_field(da, member_dim=member_dim)
+    return rolling_window_min(
+        member_min,
         window=window,
         time_dim=time_dim,
         min_periods=min_periods,
     )
-    return min_field(member_rolling, member_dim=member_dim)
 
 
 def _build_disk_kernel(radius_gridpoints: int) -> np.ndarray:

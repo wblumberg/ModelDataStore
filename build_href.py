@@ -507,9 +507,9 @@ def rolling_window_ens_max(
     """Rolling *window_hours*-hour ensemble maximum at each grid point.
 
     For each time step the maximum is taken over:
-      1. The preceding *window_hours* hourly values along the time dimension
-         for each individual member (temporal rolling max).
-      2. All ensemble members (ensemble max).
+        1. All ensemble members at each time (ensemble max).
+        2. The preceding *window_hours* hourly values along time
+            (temporal rolling max).
 
     This converts the stored 1-hour-maximum fields (e.g.
     ``MXUPHL_hght_5000_2000_max_1h``) into a *window_hours*-hour running
@@ -549,9 +549,9 @@ def rolling_window_ens_min(
 ) -> xr.DataArray:
     """Rolling *window_hours*-hour ensemble minimum at each grid point.
 
-    Mirrors :func:`rolling_window_ens_max` for minimum-valued fields such as
-    the anti-cyclonic updraft helicity (``MNUPHL``) and downward vertical
-    velocity (``MAXDVV``).
+    Mirrors :func:`rolling_window_ens_max` with member-min first, then
+    temporal rolling min for minimum-valued fields such as the anti-cyclonic
+    updraft helicity (``MNUPHL``) and downward vertical velocity (``MAXDVV``).
     """
     source = ds[var_name]
     if transform is not None:
