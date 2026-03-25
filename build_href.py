@@ -82,6 +82,15 @@ TIME_DIM = "time"
 Y_DIM = "y"
 X_DIM = "x"
 
+GRID_ATTR_KEYS: tuple[str, ...] = (
+    "grid_type", "ni", "nj",
+    "lon_0", "lat_0", "lat_std",
+    "ll_lat", "ll_lon", "ur_lat", "ur_lon",
+    "description", "source", "forecast_times", "member_name",
+)
+
+_LONGITUDE_ATTR_KEYS = {"lon_0", "ll_lon", "ur_lon"}
+
 
 def _normalize_unit_string(raw_unit: str) -> str:
     """Normalize common GRIB-style unit strings into pint-friendly units."""
@@ -188,6 +197,58 @@ def discover_member_stores(root: Path, pattern: str = "*.zarr") -> list[Path]:
     if not stores:
         logger.warning("No stores matching '%s' found under %s", pattern, root)
     return stores
+
+
+def _coerce_attr_value(value: object) -> object:
+    """Convert NumPy scalar attrs to plain Python values for stable metadata."""
+    return value.item() if hasattr(value, "item") else value
+
+
+def _normalize_longitude_degrees(value: object) -> object:
+    """Normalize numeric longitude values to [-180, 180) if possible."""
+    try:
+        return ((float(value) + 180.0) % 360.0) - 180.0
+    except (TypeError, ValueError):
+        return value
+
+
+def _collect_grid_attrs_from_members(
+    datasets: list[xr.Dataset],
+    store_paths: list[Path],
+) -> dict[str, object]:
+    """Collect grid attrs from member stores with conflict warnings."""
+    grid_attrs: dict[str, object] = {}
+
+    for key in GRID_ATTR_KEYS:
+        observed: list[tuple[Path, object]] = []
+        for ds, path in zip(datasets, store_paths):
+            if key not in ds.attrs:
+                continue
+            value = _coerce_attr_value(ds.attrs[key])
+            if key in _LONGITUDE_ATTR_KEYS:
+                value = _normalize_longitude_degrees(value)
+            if value in ("", None):
+                continue
+            observed.append((path, value))
+
+        if not observed:
+            continue
+
+        selected = observed[0][1]
+        grid_attrs[key] = selected
+
+        distinct = {repr(v) for _, v in observed}
+        if len(distinct) > 1:
+            logger.warning(
+                "Conflicting grid attr '%s' across member stores; using %r from %s",
+                key,
+                selected,
+                observed[0][0].name,
+            )
+
+    return grid_attrs
+
+
 def _tag_member_names(
     datasets: list[xr.Dataset],
     current_stores: list[Path],
@@ -279,6 +340,8 @@ def build_time_lagged_ensemble(
         )
         datasets.append(ds)
 
+    source_grid_attrs = _collect_grid_attrs_from_members(datasets, all_store_paths)
+
     # Concatenate along the pre-existing member dimension.  Each store has
     # member size 1, so this stacks them into (time, N_members, y, x).
     ensemble = xr.concat(
@@ -290,6 +353,11 @@ def build_time_lagged_ensemble(
         compat="override",
         combine_attrs="override",
     )
+
+    if source_grid_attrs:
+        # Ensure grid metadata in the concatenated ensemble reflects source
+        # member stores rather than xarray concat attr resolution behavior.
+        ensemble.attrs.update(source_grid_attrs)
 
     if TIME_DIM in ensemble.coords:
         ensemble = ensemble.sortby(TIME_DIM)
@@ -721,7 +789,7 @@ def build_product_list(
     # Product list -------------------------------------------------------------
     # Each dict requires only the "fn" key.  Add more keys (e.g. "priority")
     # if you later need to filter or order products programmatically.
-    products: list[dict[str, Callable]] = [
+products: list[dict[str, Callable]] = [
 
         # ------------------------------------------------------------------ #
         # Ensemble mean fields                                                #
@@ -778,6 +846,7 @@ def build_product_list(
         # {"fn": mean("REFD_hght_1000", "1-km Reflectivity")},               #
         # ------------------------------------------------------------------ #
     ]
+
     return products
 
 
@@ -787,13 +856,7 @@ def build_product_list(
 
 def _extract_grid_attrs(ensemble: xr.Dataset) -> dict:
     """Collect grid-description attributes from the ensemble store metadata."""
-    grid_keys = (
-        "grid_type", "ni", "nj",
-        "lon_0", "lat_0", "lat_std",
-        "ll_lat", "ll_lon", "ur_lat", "ur_lon",
-        "description", "source", "forecast_times", "member_name",
-    )
-    return {k: ensemble.attrs.get(k, "") for k in grid_keys}
+    return {k: ensemble.attrs.get(k, "") for k in GRID_ATTR_KEYS}
 
 
 def compute_href_stats(
@@ -989,8 +1052,9 @@ def write_href_stats(
 
     for idx, var_name in enumerate(data_var_names, start=1):
         var_ds = xr.Dataset({var_name: stats_ds[var_name]})
-        if idx == 1:
-            var_ds.attrs.update(stats_ds.attrs)
+        # Keep root attrs stable across append writes. Some xarray/zarr paths
+        # can replace store attrs with attrs from the incoming dataset.
+        var_ds.attrs.update(stats_ds.attrs)
         var_ds = _sanitize_dataset_for_zarr(var_ds)
         var_encoding = _build_zarr_encoding(var_ds, include_coords=(idx == 1))
         logger.info("Writing variable %d/%d: %s", idx, len(stats_ds.data_vars), var_name)
