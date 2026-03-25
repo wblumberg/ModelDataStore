@@ -14,7 +14,7 @@ I should also consider putting the BUFR sounding model data logic I've developed
 
 We can also stage ensemble member forecasts in the case of the HREF or REFS
 in zarr files from the GRIB2 directories.  For example:
-
+```
 ~/data/zarr/2026032200.href_members/
     hrrr.zarr
     wrf4nssl.zarr
@@ -30,7 +30,7 @@ in zarr files from the GRIB2 directories.  For example:
     hiresw_conusarw.zarr
     namnest.zarr
     nssl_mpashn.zarr
-
+```
 An ensemble dataset in this application will have the dimensions: (time, member, x, y)
 
 Once we have the necessary dataset in these dimensions, we calculate our ensemble output
@@ -54,34 +54,28 @@ Use this workflow when building ensembles from current and time-lagged member st
 
 1. Create a variables inventory that keeps only consistently-available fields:
 
+```
      python src/EnsDataStore/pipelines/create_inventory.py \
-         --input-root ~/data/base/model/wrf4nssl/ \
+         --input-root ~/data/base/model/ \
          --output-variables href_variables.json \
          --sample-limit 30 \
          --min-file-fraction 1.0
-
+```
 2. Build each member store for a cycle (or latest cycle only):
-
-     python src/EnsDataStore/pipelines/generate_memberStore.py \
-         --input-root ~/data/base/model/wrf4nssl/ \
-         --member wrf4nssl \
+```
+     python generate_memberStore.py \
+         --input-root ../../../data/grib2 \
+         --exclude-dirs ../../../data/grib2/ecmwf_hr \
+         --member hrrr \
          --variables-db href_variables.json \
-         --output-dir ~/data/zarr/2026032300.href_members/ \
-         --latest-cycle-only
-
-     Member stores now include per-time metadata (`source_cycle_time`,
-     `source_forecast_hour`, `source_lag_hours`) and accumulation metadata
-     (`is_run_accumulated`, `accumulation_hours`).
-
-3. Postprocess member stores into an ensemble dataset with accumulation products:
-
-     python src/EnsDataStore/pipelines/postprocess_ensemble.py \
-         --input-root ~/data/zarr/2026032300.href_members/ \
-         --output-path ~/data/zarr/2026032300.href_ensemble.zarr \
-         --accum-grib-name APCP WEASD \
-         --prefer-native-1h \
-         --reconstruct-run-total
-
-     Postprocessing prefers native 1-hour accumulation fields when available, and
-     falls back to cycle-aware differencing of run-total accumulations when needed.
-
+         --output-dir ../../../data/zarr/2026032112.href_variables/ \
+         --cycle-time 2026032112
+```   
+3. Build the HREF statistics:
+```
+     python build_href.py \
+         --current  data/zarr/2026032200.href_variables
+         --lagged   data/zarr/2026032112.href_variables
+         --output   data/zarr/2026032200.href_ensemble.zarr
+         --run-id   202603220
+```
