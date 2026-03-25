@@ -903,9 +903,8 @@ def _build_zarr_encoding(
     return encoding
 
 
-def _write_single_variable_to_zarr(
-    var_ds: xr.Dataset,
-    var_name: str,
+def _write_dataset_batch_to_zarr(
+    batch_ds: xr.Dataset,
     output_path: Path,
     *,
     is_first_write: bool,
@@ -917,15 +916,13 @@ def _write_single_variable_to_zarr(
     keep_float32_vars: set[str] | None = None,
     compression_codec: str = "zstd",
     compression_level: int = 5,
-) -> tuple[float, float]:
-    """Write a single variable to Zarr, returning (prep_time, write_time).
+) -> tuple[float, float, list[str]]:
+    """Write a batch Dataset to Zarr, returning prep/write timings and names.
 
     Parameters
     ----------
-    var_ds:
-        Single-variable Dataset to write
-    var_name:
-        Name of the variable in var_ds
+    batch_ds:
+        Batch Dataset containing one or more output variables.
     output_path:
         Path to Zarr store
     is_first_write:
@@ -944,22 +941,24 @@ def _write_single_variable_to_zarr(
     if keep_float32_vars is None:
         keep_float32_vars = set()
 
-    var_start = perf_counter()
+    batch_start = perf_counter()
+    var_names = list(batch_ds.data_vars)
 
-    # Probability outputs: convert to uint8 percent [0, 100] to reduce disk
-    if var_name.startswith("prob_"):
-        var_ds[var_name] = (
-            var_ds[var_name]
-            .clip(min=0.0, max=100.0)
-            .round()
-            .astype(np.uint8)
-        )
+    # Probability outputs: convert to uint8 percent [0, 100] to reduce disk.
+    for var_name in var_names:
+        if var_name.startswith("prob_"):
+            batch_ds[var_name] = (
+                batch_ds[var_name]
+                .clip(min=0.0, max=100.0)
+                .round()
+                .astype(np.uint8)
+            )
 
     # Keep root attrs stable across appends
-    var_ds.attrs.update(dataset_attrs)
-    var_ds = _sanitize_dataset_for_zarr(var_ds)
+    batch_ds.attrs.update(dataset_attrs)
+    batch_ds = _sanitize_dataset_for_zarr(batch_ds)
     var_encoding = _build_zarr_encoding(
-        var_ds,
+        batch_ds,
         time_chunk=time_chunk,
         y_chunk=y_chunk,
         x_chunk=x_chunk,
@@ -972,19 +971,21 @@ def _write_single_variable_to_zarr(
         clevel=int(compression_level),
         shuffle=Blosc.BITSHUFFLE,
     )
-    if var_name in var_encoding:
+    for var_name in var_names:
+        if var_name not in var_encoding:
+            continue
         var_encoding[var_name]["compressor"] = compressor
         if var_name.startswith("prob_"):
             var_encoding[var_name]["dtype"] = "uint8"
-        elif np.issubdtype(var_ds[var_name].dtype, np.floating):
+        elif np.issubdtype(batch_ds[var_name].dtype, np.floating):
             target_dtype = "float32" if var_name in keep_float32_vars else float_dtype
             var_encoding[var_name]["dtype"] = target_dtype
 
     prep_done = perf_counter()
-    prep_time = prep_done - var_start
+    prep_time = prep_done - batch_start
 
-    # Write to Zarr (first write creates store, subsequent appends)
-    var_ds.to_zarr(
+    # Write batch to Zarr (first write creates store, subsequent appends).
+    batch_ds.to_zarr(
         str(output_path),
         mode="w" if is_first_write else "a",
         consolidated=False,
@@ -995,7 +996,7 @@ def _write_single_variable_to_zarr(
     write_done = perf_counter()
     write_time = write_done - prep_done
 
-    return prep_time, write_time
+    return prep_time, write_time, var_names
 
 
 def process_and_write_products(
@@ -1011,11 +1012,12 @@ def process_and_write_products(
     keep_float32_vars: Sequence[str] | None = None,
     compression_codec: str = "zstd",
     compression_level: int = 5,
+    write_batch_size: int = 4,
 ) -> None:
-    """Compute and write ensemble statistics to Zarr, streaming one variable at a time.
+    """Compute and write ensemble statistics to Zarr in bounded batches.
 
-    This approach minimizes peak memory usage by computing and writing each product
-    immediately, rather than holding all products in memory simultaneously.
+    This approach balances throughput and memory by computing/writing a small
+    batch of products at a time, instead of strict one-by-one writes.
 
     Parameters
     ----------
@@ -1035,8 +1037,13 @@ def process_and_write_products(
         Variable names to keep at float32 precision.
     compression_codec, compression_level:
         Blosc compression settings.
+    write_batch_size:
+        Number of products to compute/write together per batch.
     """
     products = build_product_list(grid_spacing_km=grid_spacing_km)
+    if write_batch_size < 1:
+        raise ValueError("write_batch_size must be >= 1")
+
     member_names = [str(m) for m in ensemble.coords[MEMBER_DIM].values]
     n_members = len(member_names)
     keep_float32 = {name for name in (keep_float32_vars or []) if name}
@@ -1077,49 +1084,55 @@ def process_and_write_products(
     step3_start = perf_counter()
     products_written = 0
 
-    for i, entry in enumerate(products, start=1):
-        fn = entry["fn"]
-        try:
-            da = fn(ensemble)
-        except KeyError as exc:
-            logger.warning(
-                "[%d/%d] Skipping product (variable not found): %s",
-                i, len(products), exc,
-            )
-            continue
-        except Exception as exc:  # noqa: BLE001
-            logger.error(
-                "[%d/%d] Error computing product: %s",
-                i, len(products), exc,
-                exc_info=True,
-            )
+    chunk_spec = {
+        TIME_DIM: time_chunk,
+        Y_DIM: y_chunk,
+        X_DIM: x_chunk,
+    }
+
+    for start in range(0, len(products), write_batch_size):
+        end = min(start + write_batch_size, len(products))
+        batch_entries = products[start:end]
+        batch_vars: dict[str, xr.DataArray] = {}
+
+        for i, entry in enumerate(batch_entries, start=start + 1):
+            fn = entry["fn"]
+            try:
+                da = fn(ensemble)
+            except KeyError as exc:
+                logger.warning(
+                    "[%d/%d] Skipping product (variable not found): %s",
+                    i, len(products), exc,
+                )
+                continue
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "[%d/%d] Error computing product: %s",
+                    i, len(products), exc,
+                    exc_info=True,
+                )
+                continue
+
+            if da is None:
+                # Neighbourhood probability skipped due to missing scipy
+                continue
+
+            var_name = da.name or f"product_{i}"
+            if var_name in batch_vars:
+                logger.warning("Duplicate output key '%s'; overwriting batch value.", var_name)
+            batch_vars[var_name] = da
+
+        if not batch_vars:
             continue
 
-        if da is None:
-            # Neighbourhood probability skipped due to missing scipy
-            continue
-
-        var_name = da.name or f"product_{i}"
-        
-        # Chunk the variable for Zarr-compatible output
-        chunk_spec = {
-            TIME_DIM: time_chunk,
-            Y_DIM: y_chunk,
-            X_DIM: x_chunk,
-        }
-        da = da.chunk(chunk_spec)
-
-        # Create single-variable dataset with coordinate metadata from ensemble
-        var_ds = xr.Dataset({var_name: da})
+        batch_ds = xr.Dataset(batch_vars).chunk(chunk_spec)
         for coord in (TIME_DIM, Y_DIM, X_DIM):
-            if coord in ensemble.coords:
-                var_ds.coords[coord].attrs.update(ensemble.coords[coord].attrs)
+            if coord in ensemble.coords and coord in batch_ds.coords:
+                batch_ds.coords[coord].attrs.update(ensemble.coords[coord].attrs)
 
-        # Write the variable to Zarr
         is_first = products_written == 0
-        prep_time, write_time = _write_single_variable_to_zarr(
-            var_ds,
-            var_name,
+        prep_time, write_time, written_names = _write_dataset_batch_to_zarr(
+            batch_ds,
             output_path,
             is_first_write=is_first,
             dataset_attrs=dataset_attrs,
@@ -1132,12 +1145,12 @@ def process_and_write_products(
             compression_level=compression_level,
         )
 
-        products_written += 1
+        products_written += len(written_names)
         logger.info(
-            "Writing variable %d/%d: %s; prep=%.2fs write=%.2fs",
-            products_written,
-            len(products),
-            var_name,
+            "Wrote batch %d-%d (%d vars); prep=%.2fs write=%.2fs",
+            start + 1,
+            end,
+            len(written_names),
             prep_time,
             write_time,
         )
@@ -1278,6 +1291,15 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         help="Threads per Dask worker when --dask-num-workers > 0",
     )
+    parser.add_argument(
+        "--write-batch-size",
+        type=int,
+        default=4,
+        help=(
+            "Number of products to compute/write per batch. "
+            "Higher values are faster but use more memory"
+        ),
+    )
     return parser
 
 
@@ -1334,6 +1356,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             keep_float32_vars=[v.strip() for v in args.keep_float32_vars.split(",") if v.strip()],
             compression_codec=args.compression_codec,
             compression_level=args.compression_level,
+            write_batch_size=args.write_batch_size,
         )
 
         return 0
