@@ -39,9 +39,11 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 from typing import Callable, Sequence
 
 import numpy as np
@@ -54,6 +56,21 @@ if SRC_DIR.exists() and str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from EnsDataStore.calc import ensemble as ensemble_calc
+
+try:
+    import dask
+    _DASK_AVAILABLE = True
+except ImportError:
+    dask = None
+    _DASK_AVAILABLE = False
+
+try:
+    from dask.distributed import Client, LocalCluster
+    _DASK_DISTRIBUTED_AVAILABLE = True
+except ImportError:
+    Client = None
+    LocalCluster = None
+    _DASK_DISTRIBUTED_AVAILABLE = False
 
 try:
     import pint
@@ -176,6 +193,57 @@ def _to_fahrenheit_with_pint(da: xr.DataArray) -> xr.DataArray:
 
 def _to_knots_with_pint(da: xr.DataArray) -> xr.DataArray:
     return _convert_units_with_pint(da, "knot", display_unit="kt")
+
+
+def configure_dask_runtime(
+    num_workers: int,
+    threads_per_worker: int,
+) -> Client | None:
+    """Configure local Dask execution for better Slurm CPU utilization.
+
+    Returns an optional distributed ``Client`` that should be closed by the
+    caller. If distributed is not available, falls back to the threaded
+    scheduler with ``num_workers``.
+    """
+    if not _DASK_AVAILABLE:
+        logger.info("dask not installed; using xarray default execution runtime")
+        return None
+
+    if num_workers <= 0:
+        logger.info("Using default dask runtime settings")
+        return None
+
+    threads = max(1, threads_per_worker)
+
+    if _DASK_DISTRIBUTED_AVAILABLE and Client is not None and LocalCluster is not None:
+        try:
+            cluster = LocalCluster(
+                n_workers=num_workers,
+                threads_per_worker=threads,
+                processes=False,
+                dashboard_address=None,
+            )
+            client = Client(cluster)
+            logger.info(
+                "Configured local dask.distributed runtime: workers=%d, threads/worker=%d, total_threads=%d",
+                num_workers,
+                threads,
+                num_workers * threads,
+            )
+            return client
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Unable to start dask.distributed local cluster; falling back to threaded scheduler: %s",
+                exc,
+            )
+
+    # Fallback for environments without dask.distributed.
+    dask.config.set(scheduler="threads", num_workers=num_workers * threads)
+    logger.info(
+        "Configured dask threaded scheduler: num_workers=%d",
+        num_workers * threads,
+    )
+    return None
 
 
 # ===========================================================================
@@ -953,7 +1021,10 @@ def write_href_stats(
     if not data_var_names:
         raise ValueError("No data variables to write")
 
+    step3_start = perf_counter()
+
     for idx, var_name in enumerate(data_var_names, start=1):
+        var_start = perf_counter()
         var_ds = xr.Dataset({var_name: stats_ds[var_name]})
 
         # Probability outputs are stored as integer percent [0, 100] to
@@ -971,6 +1042,7 @@ def write_href_stats(
         var_ds.attrs.update(stats_ds.attrs)
         var_ds = _sanitize_dataset_for_zarr(var_ds)
         var_encoding = _build_zarr_encoding(var_ds, include_coords=(idx == 1))
+        prep_done = perf_counter()
 
         # Compression and dtype are configured per data variable.
         if var_name in var_encoding:
@@ -989,9 +1061,29 @@ def write_href_stats(
             zarr_format=2,
             encoding=var_encoding,
         )
+        write_done = perf_counter()
+        logger.info(
+            "Timing %s: prep=%.2fs write=%.2fs total=%.2fs",
+            var_name,
+            prep_done - var_start,
+            write_done - prep_done,
+            write_done - var_start,
+        )
 
     # Consolidate once at the end (much cheaper than doing it for every append).
+    consolidate_start = perf_counter()
     zarr.consolidate_metadata(str(output_path))
+    consolidate_done = perf_counter()
+    step3_done = perf_counter()
+    total_seconds = step3_done - step3_start
+    mean_seconds = total_seconds / max(1, len(stats_ds.data_vars))
+    logger.info("Timing metadata consolidation: %.2fs", consolidate_done - consolidate_start)
+    logger.info(
+        "Timing Step 3 summary: total=%.2fs vars=%d avg_per_var=%.2fs",
+        total_seconds,
+        len(stats_ds.data_vars),
+        mean_seconds,
+    )
     logger.info("Successfully wrote %d variables to %s", len(stats_ds.data_vars), output_path)
 
 
@@ -1097,6 +1189,21 @@ def build_parser() -> argparse.ArgumentParser:
         default=5,
         help="Blosc compression level (0-9)",
     )
+    parser.add_argument(
+        "--dask-num-workers",
+        type=int,
+        default=0,
+        help=(
+            "Number of local Dask workers. Set >0 to configure runtime explicitly; "
+            "0 uses default Dask settings"
+        ),
+    )
+    parser.add_argument(
+        "--dask-threads-per-worker",
+        type=int,
+        default=1,
+        help="Threads per Dask worker when --dask-num-workers > 0",
+    )
     return parser
 
 
@@ -1109,53 +1216,69 @@ def main(argv: Sequence[str] | None = None) -> int:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
+    logger.info(
+        "CPU visibility: os.cpu_count=%s, SLURM_CPUS_PER_TASK=%s",
+        os.cpu_count(),
+        os.environ.get("SLURM_CPUS_PER_TASK", "unset"),
+    )
+
     current_dir = Path(args.current)
     lagged_dir = Path(args.lagged)
     output_path = Path(args.output)
 
-    # ------------------------------------------------------------------
-    # Step 1: Build the time-lagged ensemble from member Zarr stores
-    # ------------------------------------------------------------------
-    logger.info("=== Step 1: Loading time-lagged ensemble ===")
-    ensemble = build_time_lagged_ensemble(
-        current_dir=current_dir,
-        lagged_dir=lagged_dir,
-        member_pattern=args.member_pattern,
-        concat_join=args.concat_join,
+    dask_client: Client | None = None
+    dask_client = configure_dask_runtime(
+        num_workers=args.dask_num_workers,
+        threads_per_worker=args.dask_threads_per_worker,
     )
 
-    # ------------------------------------------------------------------
-    # Step 2: Compute post-processing statistics
-    # ------------------------------------------------------------------
-    logger.info("=== Step 2: Computing post-processing statistics ===")
-    stats = compute_href_stats(
-        ensemble,
-        run_id=args.run_id,
-        grid_spacing_km=args.grid_spacing_km,
-    )
-    logger.info(
-        "Computed %d statistical products over %d members",
-        len(stats.data_vars),
-        stats.attrs["n_members"],
-    )
+    try:
+        # ------------------------------------------------------------------
+        # Step 1: Build the time-lagged ensemble from member Zarr stores
+        # ------------------------------------------------------------------
+        logger.info("=== Step 1: Loading time-lagged ensemble ===")
+        ensemble = build_time_lagged_ensemble(
+            current_dir=current_dir,
+            lagged_dir=lagged_dir,
+            member_pattern=args.member_pattern,
+            concat_join=args.concat_join,
+        )
 
-    # ------------------------------------------------------------------
-    # Step 3: Write the output Zarr store
-    # ------------------------------------------------------------------
-    logger.info("=== Step 3: Writing output Zarr store ===")
-    write_href_stats(
-        stats,
-        output_path,
-        time_chunk=args.time_chunk,
-        y_chunk=args.y_chunk,
-        x_chunk=args.x_chunk,
-        float_dtype=args.float_dtype,
-        keep_float32_vars=[v.strip() for v in args.keep_float32_vars.split(",") if v.strip()],
-        compression_codec=args.compression_codec,
-        compression_level=args.compression_level,
-    )
+        # ------------------------------------------------------------------
+        # Step 2: Compute post-processing statistics
+        # ------------------------------------------------------------------
+        logger.info("=== Step 2: Computing post-processing statistics ===")
+        stats = compute_href_stats(
+            ensemble,
+            run_id=args.run_id,
+            grid_spacing_km=args.grid_spacing_km,
+        )
+        logger.info(
+            "Computed %d statistical products over %d members",
+            len(stats.data_vars),
+            stats.attrs["n_members"],
+        )
 
-    return 0
+        # ------------------------------------------------------------------
+        # Step 3: Write the output Zarr store
+        # ------------------------------------------------------------------
+        logger.info("=== Step 3: Writing output Zarr store ===")
+        write_href_stats(
+            stats,
+            output_path,
+            time_chunk=args.time_chunk,
+            y_chunk=args.y_chunk,
+            x_chunk=args.x_chunk,
+            float_dtype=args.float_dtype,
+            keep_float32_vars=[v.strip() for v in args.keep_float32_vars.split(",") if v.strip()],
+            compression_codec=args.compression_codec,
+            compression_level=args.compression_level,
+        )
+
+        return 0
+    finally:
+        if dask_client is not None:
+            dask_client.close()
 
 
 if __name__ == "__main__":
