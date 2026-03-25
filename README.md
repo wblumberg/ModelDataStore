@@ -14,7 +14,7 @@ I should also consider putting the BUFR sounding model data logic I've developed
 
 We can also stage ensemble member forecasts in the case of the HREF or REFS
 in zarr files from the GRIB2 directories.  For example:
-
+```
 ~/data/zarr/2026032200.href_members/
     hrrr.zarr
     wrf4nssl.zarr
@@ -30,7 +30,7 @@ in zarr files from the GRIB2 directories.  For example:
     hiresw_conusarw.zarr
     namnest.zarr
     nssl_mpashn.zarr
-
+```
 An ensemble dataset in this application will have the dimensions: (time, member, x, y)
 
 Once we have the necessary dataset in these dimensions, we calculate our ensemble output
@@ -54,14 +54,15 @@ Use this workflow when building ensembles from current and time-lagged member st
 
 1. Create a variables inventory that keeps only consistently-available fields:
 
+```
      python src/EnsDataStore/pipelines/create_inventory.py \
          --input-root ~/data/base/model/ \
          --output-variables href_variables.json \
          --sample-limit 30 \
          --min-file-fraction 1.0
-
+```
 2. Build each member store for a cycle (or latest cycle only):
-
+```
      python generate_memberStore.py \
          --input-root ../../../data/grib2 \
          --exclude-dirs ../../../data/grib2/ecmwf_hr \
@@ -69,11 +70,12 @@ Use this workflow when building ensembles from current and time-lagged member st
          --variables-db href_variables.json \
          --output-dir ../../../data/zarr/2026032112.href_variables/ \
          --cycle-time 2026032112
-   
+```   
 3. Build the HREF statistics:
-4. 
+```
      python build_href.py \
          --current  data/zarr/2026032200.href_variables
          --lagged   data/zarr/2026032112.href_variables
          --output   data/zarr/2026032200.href_ensemble.zarr
          --run-id   202603220
+```
