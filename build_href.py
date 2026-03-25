@@ -199,6 +199,7 @@ def _to_knots_with_pint(da: xr.DataArray) -> xr.DataArray:
 def configure_dask_runtime(
     num_workers: int,
     threads_per_worker: int,
+    use_distributed: bool = False,
 ) -> Client | None:
     """Configure local Dask execution for better Slurm CPU utilization.
 
@@ -216,7 +217,7 @@ def configure_dask_runtime(
 
     threads = max(1, threads_per_worker)
 
-    if _DASK_DISTRIBUTED_AVAILABLE and Client is not None and LocalCluster is not None:
+    if use_distributed and _DASK_DISTRIBUTED_AVAILABLE and Client is not None and LocalCluster is not None:
         try:
             # In HPC/Slurm environments with cgroups, dask.distributed's memory auto-detection
             # from cgroup limits often yields absurdly small values (e.g., 1 MiB) that conflict
@@ -245,6 +246,10 @@ def configure_dask_runtime(
                 "Unable to start dask.distributed local cluster; falling back to threaded scheduler: %s",
                 exc,
             )
+    elif use_distributed:
+        logger.warning(
+            "--use-dask-distributed requested but dask.distributed is unavailable; using threaded scheduler",
+        )
 
     # Fallback for environments without dask.distributed.
     dask.config.set(scheduler="threads", num_workers=num_workers * threads)
@@ -1292,6 +1297,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Threads per Dask worker when --dask-num-workers > 0",
     )
     parser.add_argument(
+        "--use-dask-distributed",
+        action="store_true",
+        help=(
+            "Use dask.distributed LocalCluster runtime. By default the script uses "
+            "the threaded scheduler, which often performs better for large local graphs"
+        ),
+    )
+    parser.add_argument(
         "--write-batch-size",
         type=int,
         default=4,
@@ -1326,6 +1339,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     dask_client = configure_dask_runtime(
         num_workers=args.dask_num_workers,
         threads_per_worker=args.dask_threads_per_worker,
+        use_distributed=args.use_dask_distributed,
     )
 
     try:
