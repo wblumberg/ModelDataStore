@@ -11,6 +11,7 @@ This script:
          1-hr QPF)
        - Rolling 4-hour ensemble extremes (UH, updraft, downdraft, wind)
        - Neighbourhood exceedance probabilities (40-km radius, 4-hr window)
+             - Paintball member bitmasks for selected severe-weather thresholds
   3. Writes all statistics to a single output Zarr store that also carries
      the source grid metadata and ensemble membership information as
      dataset-level attributes.
@@ -776,6 +777,69 @@ def neighbourhood_probability(
     )
     return out
 
+def paintball_product(
+    ds: xr.Dataset,
+    var_name: str,
+    threshold: float,
+    long_name: str,
+    *,
+    strict: bool = True,
+    window_hours: int | None = None,
+    transform: Callable[[xr.DataArray], xr.DataArray] | None = None,
+    output_dtype: str | np.dtype | None = None,
+) -> xr.DataArray:
+    """Encode member threshold exceedance as an integer paintball bitmask.
+
+    Each member occupies one bit in the stored integer value following the
+    current member coordinate order. This avoids the member-count limit that
+    would come from packing paintball identifiers into floating-point mantissas.
+    """
+    source_var = var_name
+    name_source = var_name
+
+    if window_hours is not None and window_hours > 1:
+        precomputed_name = _precomputed_rolling_var_name(var_name, window_hours, extrema_kind="max")
+        if precomputed_name is not None:
+            name_source = precomputed_name
+            if precomputed_name in ds.data_vars:
+                source_var = precomputed_name
+                logger.debug("Using precomputed rolling member max %s for paintball %s", source_var, var_name)
+
+    source = ds[source_var]
+    if transform is not None:
+        source = transform(source)
+
+    if window_hours is not None and window_hours > 1 and source_var == var_name:
+        source = source.rolling({TIME_DIM: window_hours}, min_periods=1).max()
+
+    out = ensemble_calc.paintball_bitmask(
+        source,
+        threshold=threshold,
+        member_dim=MEMBER_DIM,
+        strict=strict,
+        output_dtype=output_dtype,
+    )
+
+    thresh_str = f"{int(threshold)}" if threshold == int(threshold) else f"{threshold}"
+    out.name = f"paintball_{name_source}_gt{thresh_str}"
+    out.attrs.update(
+        {
+            "long_name": f"Paintball bitmask: {long_name} > {threshold}",
+            "units": "bitmask_float",
+            "source_variable": var_name,
+            "source_variable_effective": source_var,
+            "threshold": float(threshold),
+            "window_hours": int(window_hours) if window_hours is not None else 1,
+            "stat": "paintball_bitmask",
+            "paintball_encoding": "member_bitmask",
+            "paintball_grouping": "member",
+            "paintball_storage_requirement": "float16_or_float32",
+            "paintball_float16_member_cap": 10,
+            "paintball_float32_member_cap": 23,
+        }
+    )
+    return out
+
 # ===========================================================================
 # Step 3 – Product registry
 #
@@ -848,6 +912,28 @@ def build_product_list(
             transform=transform,
         )
 
+    def paintball(
+        var: str,
+        threshold: float,
+        long_name: str,
+        *,
+        strict: bool = True,
+        window_hours: int | None = None,
+        transform: Callable[[xr.DataArray], xr.DataArray] | None = None,
+        output_dtype: str | np.dtype | None = None,
+    ) -> Callable:
+        """Paintball bitmask factory."""
+        return lambda ds: paintball_product(
+            ds,
+            var,
+            threshold,
+            long_name,
+            strict=strict,
+            window_hours=window_hours,
+            transform=transform,
+            output_dtype=output_dtype,
+        )
+
     # Product list -------------------------------------------------------------
     # Each dict requires only the "fn" key.  Add more keys (e.g. "priority")
     # if you later need to filter or order products programmatically.
@@ -889,6 +975,10 @@ def build_product_list(
         # Neighbourhood exceedance probabilities                              #
         # (4-hr rolling window, 40-km radius)                                 #
         # ------------------------------------------------------------------ #
+        # Reflectivity thresholds (dBZ)
+        {"fn": prob("MAXREF_hght_1000_max_4h",              20, "1-km Reflectivity")},
+        {"fn": prob("MAXREF_hght_1000_max_4h",              30, "1-km Reflectivity")},
+        {"fn": prob("MAXREF_hght_1000_max_4h",              40, "1-km Reflectivity")},
 
         # Updraft helicity thresholds (m² s⁻²)
         {"fn": prob("MXUPHL_hght_5000_2000_max_1h",  75,  "UH 2–5 km")},
@@ -901,6 +991,14 @@ def build_product_list(
         # Near-surface wind speed thresholds (m s⁻¹)
         {"fn": prob("WIND_hght_10_max_1h",            30,  "10-m Wind Speed", transform=_to_knots_with_pint)},
         {"fn": prob("WIND_hght_10_max_1h",            50,  "10-m Wind Speed", transform=_to_knots_with_pint)},
+
+        # ------------------------------------------------------------------ #
+        # Paintball member bitmasks                                           #
+        # ------------------------------------------------------------------ #
+        {"fn": paintball("REFD_hght_1000",                    40,  "1-km Reflectivity")},
+        {"fn": paintball("MXUPHL_hght_5000_2000_max_1h",      75,  "UH 2–5 km", window_hours=4)},
+        {"fn": paintball("MXUPHL_hght_5000_2000_max_1h",     150,  "UH 2–5 km", window_hours=4)},
+        
 
         # ------------------------------------------------------------------ #
         # Placeholder – add new products here                                 #
@@ -1029,6 +1127,9 @@ def _write_dataset_batch_to_zarr(
     if keep_float32_vars is None:
         keep_float32_vars = set()
 
+    if float_dtype not in {"float16", "float32"}:
+        raise ValueError("float_dtype must be 'float16' or 'float32'")
+
     batch_start = perf_counter()
     var_names = list(batch_ds.data_vars)
 
@@ -1041,6 +1142,19 @@ def _write_dataset_batch_to_zarr(
                 .round()
                 .astype(np.uint8)
             )
+        elif var_name.startswith("paintball_"):
+            member_cap = 10 if float_dtype == "float16" else 23
+            member_count = int(batch_ds[var_name].attrs.get("paintball_member_count", 0))
+            if member_count > member_cap:
+                raise ValueError(
+                    "Paintball member count exceeds floating-point mantissa capacity: "
+                    f"members={member_count}, float_dtype={float_dtype}, cap={member_cap}. "
+                    "Use float32 (cap 23) or reduce member count for paintball products."
+                )
+
+            # Autumnplot-GL currently expects paintball_data as Float16Array/Float32Array.
+            target_np_dtype = np.float16 if float_dtype == "float16" else np.float32
+            batch_ds[var_name] = batch_ds[var_name].astype(target_np_dtype)
 
     # Keep root attrs stable across appends
     batch_ds.attrs.update(dataset_attrs)
@@ -1065,6 +1179,8 @@ def _write_dataset_batch_to_zarr(
         var_encoding[var_name]["compressor"] = compressor
         if var_name.startswith("prob_"):
             var_encoding[var_name]["dtype"] = "uint8"
+        elif var_name.startswith("paintball_"):
+            var_encoding[var_name]["dtype"] = float_dtype
         elif np.issubdtype(batch_ds[var_name].dtype, np.floating):
             target_dtype = "float32" if var_name in keep_float32_vars else float_dtype
             var_encoding[var_name]["dtype"] = target_dtype
